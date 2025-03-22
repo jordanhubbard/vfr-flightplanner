@@ -167,6 +167,7 @@ daysSlider.addEventListener('input', function() {
 
 // Handle map clicks
 map.on('click', (e) => {
+    console.log('Map clicked at coordinates:', e.latlng);
     lastKnownPosition = e.latlng;
     
     // Update or create marker
@@ -183,54 +184,124 @@ map.on('click', (e) => {
     // Get weather data for the location
     fetchWeatherData();
     
+    // Check if airports overlay is enabled
+    const airportsEnabled = overlayCheckboxes.airports.checked;
+    console.log('Airports overlay enabled:', airportsEnabled);
+    
     // Fetch airports if the overlay is enabled
-    if (overlayCheckboxes.airports.checked) {
+    if (airportsEnabled) {
+        console.log('Fetching airports for coordinates:', lastKnownPosition);
         fetchAirports(lastKnownPosition.lat, lastKnownPosition.lng);
     }
 });
 
+// Function to get marker color based on flight category
+function getFlightCategoryColor(category) {
+    switch (category) {
+        case 'VFR':
+            return '#00ff00';  // Green
+        case 'MVFR':
+            return '#0000ff';  // Blue
+        case 'IFR':
+            return '#ff0000';  // Red
+        case 'LIFR':
+            return '#ff00ff';  // Magenta
+        default:
+            return '#808080';  // Grey for unknown/no METAR
+    }
+}
+
+// Function to create a dot icon
+function createDotIcon(color) {
+    return L.divIcon({
+        className: 'airport-dot',
+        html: `<div style="
+            background-color: ${color};
+            border: 2px solid #000;
+            border-radius: 50%;
+            width: 12px;
+            height: 12px;
+            opacity: 0.8;
+        "></div>`,
+        iconSize: [12, 12],
+        iconAnchor: [6, 6]
+    });
+}
+
 // Function to fetch and display airports
 async function fetchAirports(lat, lon) {
     try {
+        console.log(`Starting airport fetch for coordinates: ${lat}, ${lon}`);
+        
+        const requestBody = {
+            lat: lat,
+            lon: lon,
+            radius: 50  // 50km radius
+        };
+        console.log('Sending request with body:', requestBody);
+        
         const response = await fetch('/get_airports', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({
-                lat: lat,
-                lon: lon,
-                radius: 50  // 50km radius
-            })
+            body: JSON.stringify(requestBody)
         });
         
+        console.log('Got response:', response.status, response.statusText);
+        
         if (!response.ok) {
-            throw new Error('Failed to fetch airports');
+            const errorData = await response.json();
+            throw new Error(`Failed to fetch airports: ${errorData.details || errorData.error || response.statusText}`);
         }
         
         const data = await response.json();
+        console.log('Received airport data:', data);
         
         // Clear existing airport markers
+        console.log(`Clearing ${airportMarkers.length} existing markers`);
         airportMarkers.forEach(marker => map.removeLayer(marker));
         airportMarkers = [];
         
         // Add new airport markers
+        console.log(`Adding ${data.airports.length} new airport markers`);
         data.airports.forEach(airport => {
-            const marker = L.marker([airport.lat, airport.lon])
-                .bindPopup(`
-                    <strong>${airport.name}</strong><br>
-                    ${airport.iata ? `IATA: ${airport.iata}` : ''}<br>
-                    ${airport.icao ? `ICAO: ${airport.icao}` : ''}<br>
-                    Type: ${airport.type}
-                `);
+            console.log('Creating marker for airport:', airport);
+            
+            // Get color based on flight category
+            const color = getFlightCategoryColor(airport.flight_category);
+            
+            // Create tooltip text
+            const tooltipText = airport.icao || airport.iata || airport.name;
+            
+            // Create marker with colored dot
+            const marker = L.marker([airport.lat, airport.lon], {
+                icon: createDotIcon(color)
+            })
+            .bindPopup(`
+                <strong>${airport.name}</strong><br>
+                ${airport.iata ? `IATA: ${airport.iata}<br>` : ''}
+                ${airport.icao ? `ICAO: ${airport.icao}<br>` : ''}
+                Type: ${airport.type}<br>
+                Flight Category: ${airport.flight_category || 'Unknown'}
+            `)
+            .bindTooltip(tooltipText, {
+                permanent: false,
+                direction: 'top',
+                offset: [0, -8],
+                className: 'airport-tooltip'
+            });
             
             // Only add to map if airports overlay is checked
             if (overlayCheckboxes.airports.checked) {
+                console.log('Adding marker to map for:', airport.name);
                 marker.addTo(map);
             }
             
             airportMarkers.push(marker);
         });
+        
+        console.log(`Successfully added ${airportMarkers.length} airport markers`);
     } catch (error) {
         console.error('Error fetching airports:', error);
     }
@@ -248,12 +319,13 @@ const overlayCheckboxes = {
 // Add event listeners to all checkboxes
 Object.entries(overlayCheckboxes).forEach(([type, checkbox]) => {
     checkbox.addEventListener('change', (e) => {
+        console.log(`Overlay ${type} changed:`, e.target.checked);
         if (type === 'airports') {
             if (e.target.checked && lastKnownPosition) {
-                // If airports are being enabled, fetch and show them
+                console.log('Airports overlay enabled, fetching airports for:', lastKnownPosition);
                 fetchAirports(lastKnownPosition.lat, lastKnownPosition.lng);
             } else {
-                // If airports are being disabled, remove all markers
+                console.log('Airports overlay disabled, removing markers');
                 airportMarkers.forEach(marker => map.removeLayer(marker));
             }
         } else {

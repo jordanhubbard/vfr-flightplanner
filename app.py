@@ -5,6 +5,7 @@ import os
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta
 import logging
+import xml.etree.ElementTree as ET
 
 # Configure logging
 logging.basicConfig(
@@ -400,6 +401,153 @@ def get_weather():
             'details': str(e)
         }), 500
 
+def get_flight_category(metar_data):
+    """
+    Determine flight category from METAR data.
+    Returns: 'VFR', 'MVFR', 'IFR', 'LIFR', or None if unknown
+    """
+    try:
+        # Extract ceiling and visibility from METAR XML
+        flight_category = metar_data.find('.//flight_category')
+        if flight_category is not None:
+            return flight_category.text
+        
+        return None
+    except Exception as e:
+        app.logger.error(f'Error parsing METAR data: {str(e)}')
+        return None
+
+def get_metar_data(icao_codes):
+    """Fetch METAR data for a list of airports"""
+    if not icao_codes:
+        app.logger.info('No ICAO codes provided to get_metar_data')
+        return {}
+    
+    # Filter out empty ICAO codes
+    valid_icaos = [code for code in icao_codes if code]
+    if not valid_icaos:
+        app.logger.info('No valid ICAO codes after filtering')
+        return {}
+    
+    app.logger.info(f'Fetching METAR data for airports: {valid_icaos}')
+    
+    try:
+        # AWC API endpoint for METAR data
+        awc_url = "https://aviationweather.gov/cgi-bin/data/dataserver.php"
+        
+        # Join ICAO codes with comma AND space as required by the API
+        station_string = ', '.join(valid_icaos)
+        app.logger.info(f'Using station string: {station_string}')
+        
+        params = {
+            'dataSource': 'metars',
+            'requestType': 'retrieve',
+            'format': 'xml',
+            'stationString': station_string,
+            'hoursBeforeNow': '3',
+            'mostRecent': 'true'
+        }
+        
+        app.logger.info(f'Sending request to AWC API with params: {params}')
+        
+        response = requests.get(awc_url, params=params, timeout=10)
+        app.logger.info(f'AWC API response status: {response.status_code}')
+        
+        if not response.ok:
+            app.logger.error(f'AWC API error: {response.text}')
+            return {}
+            
+        response.raise_for_status()
+        
+        # Log raw XML response for debugging
+        app.logger.info(f'AWC API raw response: {response.text}')
+        
+        # Parse XML response
+        root = ET.fromstring(response.content)
+        
+        # Check if we got any data
+        data_element = root.find('.//data')
+        if data_element is not None:
+            num_results = data_element.get('num_results', '0')
+            app.logger.info(f'AWC API returned {num_results} results')
+        
+        # Create a dictionary of ICAO -> flight category
+        metar_dict = {}
+        for metar in root.findall('.//METAR'):
+            station_id = metar.find('station_id')
+            if station_id is not None:
+                # Try to determine flight category from ceiling and visibility
+                sky_conditions = metar.findall('sky_condition')
+                visibility_element = metar.find('visibility_statute_mi')
+                flight_cat_element = metar.find('flight_category')
+                
+                flight_category = None
+                
+                # First try to get the flight category directly
+                if flight_cat_element is not None:
+                    flight_category = flight_cat_element.text
+                    app.logger.info(f'Found direct flight category {flight_category} for {station_id.text}')
+                
+                # If no flight category, try to determine from ceiling and visibility
+                if not flight_category and sky_conditions and visibility_element is not None:
+                    try:
+                        visibility = float(visibility_element.text)
+                        # Find the lowest ceiling from all sky conditions
+                        ceiling = 99999
+                        for sky in sky_conditions:
+                            if sky.get('sky_cover') in ['BKN', 'OVC']:
+                                try:
+                                    base = float(sky.get('cloud_base_ft_agl', '99999'))
+                                    ceiling = min(ceiling, base)
+                                except (ValueError, TypeError):
+                                    continue
+                        
+                        app.logger.info(f'For {station_id.text}: Found ceiling={ceiling}ft, visibility={visibility}sm')
+                        
+                        # Determine flight category based on ceiling and visibility
+                        if ceiling < 500 or visibility < 1:
+                            flight_category = 'LIFR'
+                        elif ceiling < 1000 or visibility < 3:
+                            flight_category = 'IFR'
+                        elif ceiling < 3000 or visibility < 5:
+                            flight_category = 'MVFR'
+                        else:
+                            flight_category = 'VFR'
+                        
+                        app.logger.info(f'Determined flight category {flight_category} for {station_id.text} from ceiling={ceiling} visibility={visibility}')
+                    except (ValueError, TypeError) as e:
+                        app.logger.error(f'Error parsing ceiling/visibility for {station_id.text}: {str(e)}')
+                        continue
+                
+                metar_dict[station_id.text] = flight_category
+                app.logger.info(f'Added flight category {flight_category} for station {station_id.text}')
+        
+        # For any airports that didn't return data, try requesting them individually
+        missing_airports = [code for code in valid_icaos if code not in metar_dict]
+        if missing_airports:
+            app.logger.info(f'Trying to fetch data individually for missing airports: {missing_airports}')
+            for icao in missing_airports:
+                params['stationString'] = icao
+                try:
+                    response = requests.get(awc_url, params=params, timeout=10)
+                    if response.ok:
+                        root = ET.fromstring(response.content)
+                        metar = root.find('.//METAR')
+                        if metar is not None:
+                            station_id = metar.find('station_id')
+                            flight_cat = metar.find('flight_category')
+                            if station_id is not None and flight_cat is not None:
+                                metar_dict[station_id.text] = flight_cat.text
+                                app.logger.info(f'Added flight category {flight_cat.text} for station {station_id.text} (individual request)')
+                except Exception as e:
+                    app.logger.error(f'Error fetching individual METAR for {icao}: {str(e)}')
+        
+        app.logger.info(f'Final processed METAR data: {metar_dict}')
+        return metar_dict
+    except Exception as e:
+        app.logger.error(f'Error fetching METAR data: {str(e)}')
+        return {}
+
 @app.route('/get_airports', methods=['POST'])
 def get_airports():
     try:
@@ -407,6 +555,8 @@ def get_airports():
         lat = data.get('lat')
         lon = data.get('lon')
         radius = data.get('radius', 50)  # Default radius in kilometers
+        
+        app.logger.info(f'Fetching airports for coordinates: {lat}, {lon} with radius: {radius}km')
         
         if not all(isinstance(x, (int, float)) for x in [lat, lon]):
             return jsonify({
@@ -419,30 +569,120 @@ def get_airports():
         query = f"""
         [out:json][timeout:25];
         (
-          node["aeroway"="aerodrome"](around:{radius},{lat},{lon});
-          way["aeroway"="aerodrome"](around:{radius},{lat},{lon});
-          relation["aeroway"="aerodrome"](around:{radius},{lat},{lon});
+          // Find specific airports we know exist in the area
+          nwr["aeroway"="aerodrome"]["icao"="KPAO"](around:{radius*1000},{lat},{lon});
+          nwr["aeroway"="aerodrome"]["icao"="KSQL"](around:{radius*1000},{lat},{lon});
+          nwr["aeroway"="aerodrome"]["icao"="KHAF"](around:{radius*1000},{lat},{lon});
+          nwr["aeroway"="aerodrome"]["icao"="KSFO"](around:{radius*1000},{lat},{lon});
+          nwr["aeroway"="aerodrome"]["icao"="KSJC"](around:{radius*1000},{lat},{lon});
+          
+          // Find any other airports with ICAO codes
+          nwr["aeroway"="aerodrome"]["icao"](around:{radius*1000},{lat},{lon});
+          
+          // Find airports with IATA codes as backup
+          nwr["aeroway"="aerodrome"]["iata"](around:{radius*1000},{lat},{lon});
+          
+          // Find airports with FAA identifiers
+          nwr["aeroway"="aerodrome"]["ref:faa"](around:{radius*1000},{lat},{lon});
         );
+        out center;
         out body;
-        >;
-        out skel qt;
         """
         
+        app.logger.info(f'Sending Overpass API query: {query}')
+        
         response = requests.post(overpass_url, data=query)
+        app.logger.info(f'Overpass API response status: {response.status_code}')
+        
+        if not response.ok:
+            app.logger.error(f'Overpass API error: {response.text}')
+            return jsonify({
+                'error': 'Failed to fetch airports',
+                'details': 'Overpass API request failed'
+            }), 400
+            
         response.raise_for_status()
         
+        raw_data = response.json()
+        app.logger.info(f'Found {len(raw_data.get("elements", []))} elements in Overpass response')
+        
         airports = []
-        for element in response.json().get('elements', []):
+        icao_codes = []
+        seen_airports = set()  # To prevent duplicates
+        
+        for element in raw_data.get('elements', []):
             if 'tags' in element:
-                airport = {
-                    'name': element['tags'].get('name', 'Unnamed Airport'),
-                    'type': element['tags'].get('aeroway', 'Unknown'),
-                    'lat': element.get('lat', 0),
-                    'lon': element.get('lon', 0),
-                    'iata': element['tags'].get('iata', ''),
-                    'icao': element['tags'].get('icao', '')
-                }
-                airports.append(airport)
+                tags = element['tags']
+                # Skip model airfields and similar facilities
+                if (tags.get('service') == 'model' or 
+                    tags.get('leisure') == 'model_aerodrome' or
+                    'model' in tags.get('name', '').lower() or
+                    'rc' in tags.get('name', '').lower() or
+                    'radio control' in tags.get('name', '').lower() or
+                    'remote control' in tags.get('name', '').lower()):
+                    continue
+                    
+                if tags.get('aeroway') == 'aerodrome':
+                    # Get coordinates either from direct lat/lon or center
+                    element_lat = element.get('lat')
+                    element_lon = element.get('lon')
+                    
+                    if element_lat is None or element_lon is None:
+                        if 'center' in element:
+                            element_lat = element['center'].get('lat')
+                            element_lon = element['center'].get('lon')
+                    
+                    if element_lat is not None and element_lon is not None:
+                        # Try to get ICAO code from various tags
+                        icao = tags.get('icao', '')
+                        if not icao and tags.get('ref:faa', '').startswith('K'):
+                            icao = tags.get('ref:faa', '')
+                        
+                        name = tags.get('name', tags.get('ref', 'Unnamed Airport'))
+                        
+                        # Skip if it looks like a model field
+                        if any(keyword in name.lower() for keyword in ['model', 'rc', 'radio control', 'remote control']):
+                            continue
+                        
+                        # Use ICAO or name as unique identifier
+                        airport_id = icao if icao else name
+                        
+                        if airport_id not in seen_airports:
+                            seen_airports.add(airport_id)
+                            
+                            if icao:
+                                icao_codes.append(icao)
+                                app.logger.info(f'Found airport with ICAO code: {icao}')
+                            else:
+                                app.logger.info(f'Found airport without ICAO code: {name}')
+                                
+                            airport = {
+                                'name': name,
+                                'type': tags.get('aeroway', 'unknown'),
+                                'lat': element_lat,
+                                'lon': element_lon,
+                                'iata': tags.get('iata', ''),
+                                'icao': icao,
+                                'description': tags.get('description', ''),
+                                'operator': tags.get('operator', '')
+                            }
+                            airports.append(airport)
+                            app.logger.info(f'Added airport to list: {airport["name"]} ({airport["icao"] or airport["iata"] or "no code"})')
+        
+        app.logger.info(f'Found {len(airports)} airports total, {len(icao_codes)} with ICAO codes')
+        
+        # Fetch METAR data for airports with ICAO codes
+        metar_data = get_metar_data(icao_codes)
+        
+        # Add flight category to each airport
+        for airport in airports:
+            if airport['icao']:
+                airport['flight_category'] = metar_data.get(airport['icao'])
+                app.logger.info(f'Added flight category {airport["flight_category"]} for {airport["icao"]}')
+            else:
+                airport['flight_category'] = None
+        
+        app.logger.info(f'Returning {len(airports)} airports with weather data')
         
         return jsonify({'airports': airports})
         
