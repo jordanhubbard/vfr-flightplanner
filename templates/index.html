@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Weather Forecaster</title>
+    
+    <!-- Leaflet CSS and JS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Weather Forecaster</h1>
+            <div class="api-status">
+                <div class="status-indicator" id="owm-indicator">
+                    <span class="status-label">OpenWeatherMap API:</span>
+                    <span id="owm-status" class="status-dot"></span>
+                    <span id="owm-calls" class="api-calls"></span>
+                    <div class="error-details" id="owm-error">
+                        <div class="error-content">
+                            <h4>OpenWeatherMap API Error</h4>
+                            <p id="owm-error-message">No errors reported</p>
+                            <span class="last-check" id="owm-last-check"></span>
+                        </div>
+                    </div>
+                </div>
+                <div class="status-indicator" id="meteo-indicator">
+                    <span class="status-label">Open-Meteo API:</span>
+                    <span id="meteo-status" class="status-dot"></span>
+                    <div class="error-details" id="meteo-error">
+                        <div class="error-content">
+                            <h4>Open-Meteo API Error</h4>
+                            <p id="meteo-error-message">No errors reported</p>
+                            <span class="last-check" id="meteo-last-check"></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </header>
+        
+        <div class="controls">
+            <div class="control-group">
+                <label for="forecast-days">Forecast Days:</label>
+                <input type="range" id="forecast-days" min="1" max="16" value="7">
+                <span id="days-value">7</span>
+            </div>
+            
+            <div class="control-group">
+                <label for="overlay-opacity">Overlay Opacity:</label>
+                <input type="range" id="overlay-opacity" min="0" max="100" value="70">
+            </div>
+            
+            <div class="control-group">
+                <label>Weather Overlays:</label>
+                <div class="checkbox-group">
+                    <label>
+                        <input type="checkbox" id="clouds-overlay" checked>
+                        Clouds
+                    </label>
+                    <label>
+                        <input type="checkbox" id="precipitation-overlay">
+                        Precipitation
+                    </label>
+                    <label>
+                        <input type="checkbox" id="wind-overlay">
+                        Wind
+                    </label>
+                    <label>
+                        <input type="checkbox" id="temp-overlay">
+                        Temperature
+                    </label>
+                    <label>
+                        <input type="checkbox" id="airports-overlay">
+                        Airports
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <div id="map"></div>
+            <div id="weather-info">
+                <div class="weather-header">
+                    <h2>Weather Forecast</h2>
+                    <div class="location-controls">
+                        <div class="airport-search">
+                            <input type="text" id="airport-code" placeholder="Enter airport code (e.g., KLAX)" maxlength="4">
+                            <button id="go-airport">Go</button>
+                        </div>
+                        <p id="selected-location">Click on the map to select a location</p>
+                    </div>
+                </div>
+                <div id="forecast-container"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Initialize API key for weather overlays -->
+    <script>
+        const API_KEY = '{{ api_key }}';
+    </script>
+    
+    <!-- Custom JS -->
+    <script>
+        // Get initial coordinates from server if provided
+        const initialLat = {{ initial_lat|tojson|safe if initial_lat else 'null' }};
+        const initialLon = {{ initial_lon|tojson|safe if initial_lon else 'null' }};
+    </script>
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+</body>
+</html> 
