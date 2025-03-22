@@ -228,7 +228,8 @@ def get_weather():
                 'temperature_2m',
                 'windspeed_10m',
                 'winddirection_10m',
-                'windgusts_10m'
+                'windgusts_10m',
+                'cloud_base'  # Add cloud base to hourly parameters
             ],
             'daily': [
                 'weathercode',
@@ -281,10 +282,11 @@ def get_weather():
         # Log raw Open-Meteo response
         app.logger.info(f'Open-Meteo raw response: {meteo_data}')
         
-        # Process hourly wind data to get daily values
+        # Process hourly wind data and cloud base to get daily values
         daily_wind_speed = []
         daily_wind_direction = []
         daily_wind_gusts = []
+        daily_cloud_base = []
         daily_dates = []
         
         if 'hourly' in meteo_data:
@@ -293,6 +295,7 @@ def get_weather():
             day_wind_speeds = []
             day_wind_directions = []
             day_wind_gusts = []
+            day_cloud_bases = []
             
             for i, time in enumerate(hourly_data['time']):
                 # Convert unix timestamp to date
@@ -305,11 +308,16 @@ def get_weather():
                     # Process previous day's data - use median for more stable values
                     day_wind_speeds.sort()
                     day_wind_gusts.sort()
-                    mid_idx = len(day_wind_speeds) // 2
+                    day_cloud_bases = [cb for cb in day_cloud_bases if cb is not None]  # Filter out None values
+                    if day_cloud_bases:
+                        day_cloud_bases.sort()
+                        daily_cloud_base.append(day_cloud_bases[len(day_cloud_bases) // 2])  # Use median cloud base
+                    else:
+                        daily_cloud_base.append(None)
                     
+                    mid_idx = len(day_wind_speeds) // 2
                     daily_wind_speed.append(day_wind_speeds[mid_idx])
                     daily_wind_gusts.append(day_wind_gusts[mid_idx])
-                    # Use the wind direction associated with the median wind speed
                     daily_wind_direction.append(day_wind_directions[day_wind_speeds.index(day_wind_speeds[mid_idx])])
                     daily_dates.append(current_day)
                     
@@ -318,21 +326,31 @@ def get_weather():
                     day_wind_speeds = []
                     day_wind_directions = []
                     day_wind_gusts = []
+                    day_cloud_bases = []
                 
                 # Wind speeds are already in knots due to windspeed_unit parameter
                 wind_speed = hourly_data['windspeed_10m'][i]
                 wind_gust = hourly_data['windgusts_10m'][i]
+                cloud_base = hourly_data.get('cloud_base', [None])[i]  # Get cloud base, default to None if not available
                 
                 day_wind_speeds.append(wind_speed)
                 day_wind_directions.append(hourly_data['winddirection_10m'][i])
                 day_wind_gusts.append(wind_gust)
+                if cloud_base is not None:
+                    day_cloud_bases.append(cloud_base * 3.28084)  # Convert meters to feet
             
             # Process last day's data
             if day_wind_speeds:
                 day_wind_speeds.sort()
                 day_wind_gusts.sort()
-                mid_idx = len(day_wind_speeds) // 2
+                day_cloud_bases = [cb for cb in day_cloud_bases if cb is not None]  # Filter out None values
+                if day_cloud_bases:
+                    day_cloud_bases.sort()
+                    daily_cloud_base.append(day_cloud_bases[len(day_cloud_bases) // 2])  # Use median cloud base
+                else:
+                    daily_cloud_base.append(None)
                 
+                mid_idx = len(day_wind_speeds) // 2
                 daily_wind_speed.append(day_wind_speeds[mid_idx])
                 daily_wind_gusts.append(day_wind_gusts[mid_idx])
                 daily_wind_direction.append(day_wind_directions[day_wind_speeds.index(day_wind_speeds[mid_idx])])
@@ -370,7 +388,8 @@ def get_weather():
                 'cloudcover_mean': meteo_data['daily']['cloudcover_mean'],
                 'visibility_mean': meteo_data['daily']['visibility_mean'],
                 'pressure': [day.get('pressure', 1013.25) * 0.02953 for day in owm_data.get('daily', [])],  # Convert hPa to inHg
-                'humidity': [day.get('humidity', 0) for day in owm_data.get('daily', [])]
+                'humidity': [day.get('humidity', 0) for day in owm_data.get('daily', [])],
+                'cloudbase_ft': daily_cloud_base  # Add cloud base in feet
             }
         }
         
@@ -471,7 +490,7 @@ def get_metar_data(icao_codes):
             num_results = data_element.get('num_results', '0')
             app.logger.info(f'AWC API returned {num_results} results')
         
-        # Create a dictionary of ICAO -> flight category
+        # Create a dictionary of ICAO -> weather data
         metar_dict = {}
         for metar in root.findall('.//METAR'):
             station_id = metar.find('station_id')
@@ -480,47 +499,96 @@ def get_metar_data(icao_codes):
                 sky_conditions = metar.findall('sky_condition')
                 visibility_element = metar.find('visibility_statute_mi')
                 flight_cat_element = metar.find('flight_category')
+                raw_text = metar.find('raw_text')
                 
-                flight_category = None
+                # Initialize weather data dictionary for this station
+                weather_data = {
+                    'flight_category': None,
+                    'ceiling_ft': None,
+                    'ceiling_layer': None,
+                    'visibility_sm': None,
+                    'raw_text': raw_text.text if raw_text is not None else None,
+                    'all_layers': [],
+                    'wind_speed_kt': None,
+                    'wind_dir_degrees': None
+                }
+                
+                # Get wind information
+                wind_speed = metar.find('wind_speed_kt')
+                wind_dir = metar.find('wind_dir_degrees')
+                if wind_speed is not None:
+                    try:
+                        weather_data['wind_speed_kt'] = float(wind_speed.text)
+                    except (ValueError, TypeError):
+                        pass
+                if wind_dir is not None:
+                    try:
+                        weather_data['wind_dir_degrees'] = float(wind_dir.text)
+                    except (ValueError, TypeError):
+                        pass
+                
+                # Process sky conditions
+                ceiling = 99999
+                ceiling_layer = None
+                for sky in sky_conditions:
+                    cover = sky.get('sky_cover')
+                    base = sky.get('cloud_base_ft_agl')
+                    # Store all layer information
+                    if cover and base:
+                        try:
+                            base_ft = float(base)
+                            weather_data['all_layers'].append({
+                                'cover': cover,
+                                'base_ft': base_ft
+                            })
+                            # Update ceiling if this is a ceiling layer (BKN or OVC)
+                            if cover in ['BKN', 'OVC'] and base_ft < ceiling:
+                                ceiling = base_ft
+                                ceiling_layer = cover
+                        except (ValueError, TypeError):
+                            continue
+                
+                # Store ceiling information
+                if ceiling < 99999:
+                    weather_data['ceiling_ft'] = ceiling
+                    weather_data['ceiling_layer'] = ceiling_layer
+                elif not sky_conditions or all(sky.get('sky_cover') in ['SKC', 'CLR', 'FEW', 'SCT'] for sky in sky_conditions):
+                    weather_data['ceiling_ft'] = None
+                    weather_data['ceiling_layer'] = 'CLR'
+                
+                # Store visibility
+                if visibility_element is not None:
+                    try:
+                        weather_data['visibility_sm'] = float(visibility_element.text)
+                    except (ValueError, TypeError):
+                        pass
                 
                 # First try to get the flight category directly
                 if flight_cat_element is not None:
-                    flight_category = flight_cat_element.text
-                    app.logger.info(f'Found direct flight category {flight_category} for {station_id.text}')
+                    weather_data['flight_category'] = flight_cat_element.text
+                    app.logger.info(f'Found direct flight category {weather_data["flight_category"]} for {station_id.text}')
                 
-                # If no flight category, try to determine from ceiling and visibility
-                if not flight_category and sky_conditions and visibility_element is not None:
-                    try:
-                        visibility = float(visibility_element.text)
-                        # Find the lowest ceiling from all sky conditions
-                        ceiling = 99999
-                        for sky in sky_conditions:
-                            if sky.get('sky_cover') in ['BKN', 'OVC']:
-                                try:
-                                    base = float(sky.get('cloud_base_ft_agl', '99999'))
-                                    ceiling = min(ceiling, base)
-                                except (ValueError, TypeError):
-                                    continue
-                        
-                        app.logger.info(f'For {station_id.text}: Found ceiling={ceiling}ft, visibility={visibility}sm')
-                        
-                        # Determine flight category based on ceiling and visibility
-                        if ceiling < 500 or visibility < 1:
-                            flight_category = 'LIFR'
-                        elif ceiling < 1000 or visibility < 3:
-                            flight_category = 'IFR'
-                        elif ceiling < 3000 or visibility < 5:
-                            flight_category = 'MVFR'
-                        else:
-                            flight_category = 'VFR'
-                        
-                        app.logger.info(f'Determined flight category {flight_category} for {station_id.text} from ceiling={ceiling} visibility={visibility}')
-                    except (ValueError, TypeError) as e:
-                        app.logger.error(f'Error parsing ceiling/visibility for {station_id.text}: {str(e)}')
-                        continue
+                # If no flight category, determine from ceiling and visibility
+                if not weather_data['flight_category'] and weather_data['ceiling_ft'] is not None and weather_data['visibility_sm'] is not None:
+                    ceiling = weather_data['ceiling_ft']
+                    visibility = weather_data['visibility_sm']
+                    
+                    # Determine flight category based on ceiling and visibility
+                    if ceiling == None and weather_data['ceiling_layer'] == 'CLR':
+                        weather_data['flight_category'] = 'VFR'
+                    elif ceiling < 500 or visibility < 1:
+                        weather_data['flight_category'] = 'LIFR'
+                    elif ceiling < 1000 or visibility < 3:
+                        weather_data['flight_category'] = 'IFR'
+                    elif ceiling < 3000 or visibility < 5:
+                        weather_data['flight_category'] = 'MVFR'
+                    else:
+                        weather_data['flight_category'] = 'VFR'
+                    
+                    app.logger.info(f'Determined flight category {weather_data["flight_category"]} for {station_id.text} from ceiling={ceiling} visibility={visibility}')
                 
-                metar_dict[station_id.text] = flight_category
-                app.logger.info(f'Added flight category {flight_category} for station {station_id.text}')
+                metar_dict[station_id.text] = weather_data
+                app.logger.info(f'Added weather data for station {station_id.text}: {weather_data}')
         
         # For any airports that didn't return data, try requesting them individually
         missing_airports = [code for code in valid_icaos if code not in metar_dict]
@@ -535,10 +603,69 @@ def get_metar_data(icao_codes):
                         metar = root.find('.//METAR')
                         if metar is not None:
                             station_id = metar.find('station_id')
-                            flight_cat = metar.find('flight_category')
-                            if station_id is not None and flight_cat is not None:
-                                metar_dict[station_id.text] = flight_cat.text
-                                app.logger.info(f'Added flight category {flight_cat.text} for station {station_id.text} (individual request)')
+                            if station_id is not None:
+                                # Process this METAR the same way as above
+                                sky_conditions = metar.findall('sky_condition')
+                                visibility_element = metar.find('visibility_statute_mi')
+                                flight_cat_element = metar.find('flight_category')
+                                raw_text = metar.find('raw_text')
+                                
+                                weather_data = {
+                                    'flight_category': flight_cat_element.text if flight_cat_element is not None else None,
+                                    'ceiling_ft': None,
+                                    'ceiling_layer': None,
+                                    'visibility_sm': None,
+                                    'raw_text': raw_text.text if raw_text is not None else None,
+                                    'all_layers': [],
+                                    'wind_speed_kt': None,
+                                    'wind_dir_degrees': None
+                                }
+                                
+                                # Get wind information
+                                wind_speed = metar.find('wind_speed_kt')
+                                wind_dir = metar.find('wind_dir_degrees')
+                                if wind_speed is not None:
+                                    try:
+                                        weather_data['wind_speed_kt'] = float(wind_speed.text)
+                                    except (ValueError, TypeError):
+                                        pass
+                                if wind_dir is not None:
+                                    try:
+                                        weather_data['wind_dir_degrees'] = float(wind_dir.text)
+                                    except (ValueError, TypeError):
+                                        pass
+                                
+                                # Process sky conditions
+                                ceiling = 99999
+                                ceiling_layer = None
+                                for sky in sky_conditions:
+                                    cover = sky.get('sky_cover')
+                                    base = sky.get('cloud_base_ft_agl')
+                                    if cover and base:
+                                        try:
+                                            base_ft = float(base)
+                                            weather_data['all_layers'].append({
+                                                'cover': cover,
+                                                'base_ft': base_ft
+                                            })
+                                            if cover in ['BKN', 'OVC'] and base_ft < ceiling:
+                                                ceiling = base_ft
+                                                ceiling_layer = cover
+                                        except (ValueError, TypeError):
+                                            continue
+                                
+                                if ceiling < 99999:
+                                    weather_data['ceiling_ft'] = ceiling
+                                    weather_data['ceiling_layer'] = ceiling_layer
+                                
+                                if visibility_element is not None:
+                                    try:
+                                        weather_data['visibility_sm'] = float(visibility_element.text)
+                                    except (ValueError, TypeError):
+                                        pass
+                                
+                                metar_dict[station_id.text] = weather_data
+                                app.logger.info(f'Added weather data for station {station_id.text} (individual request): {weather_data}')
                 except Exception as e:
                     app.logger.error(f'Error fetching individual METAR for {icao}: {str(e)}')
         
@@ -677,10 +804,22 @@ def get_airports():
         # Add flight category to each airport
         for airport in airports:
             if airport['icao']:
-                airport['flight_category'] = metar_data.get(airport['icao'])
-                app.logger.info(f'Added flight category {airport["flight_category"]} for {airport["icao"]}')
+                weather_data = metar_data.get(airport['icao'])
+                if weather_data:
+                    airport['weather'] = weather_data
+                    app.logger.info(f'Added weather data for {airport["icao"]}: {weather_data}')
+                else:
+                    airport['weather'] = {
+                        'flight_category': None,
+                        'ceiling_ft': None,
+                        'ceiling_layer': None,
+                        'visibility_sm': None,
+                        'wind_speed_kt': None,
+                        'wind_dir_degrees': None,
+                        'all_layers': []
+                    }
             else:
-                airport['flight_category'] = None
+                airport['weather'] = None
         
         app.logger.info(f'Returning {len(airports)} airports with weather data')
         

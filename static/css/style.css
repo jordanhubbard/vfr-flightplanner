@@ -146,6 +146,7 @@ input[type="range"] {
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
     border-radius: 8px;
     overflow: hidden;
+    font-size: 14px;
 }
 
 .forecast-table th,
@@ -153,6 +154,7 @@ input[type="range"] {
     padding: 12px 15px;
     text-align: left;
     border-bottom: 1px solid #eee;
+    white-space: nowrap;
 }
 
 .forecast-table th {
@@ -197,7 +199,6 @@ input[type="range"] {
 .forecast-table .wind-advisory {
     color: #e74c3c;
     font-weight: 500;
-    font-size: 0.9em;
     margin-left: 5px;
 }
 
@@ -226,13 +227,15 @@ input[type="range"] {
 
 /* Responsive table */
 @media (max-width: 768px) {
-    .forecast-table td {
-        padding: 8px;
-        font-size: 0.9rem;
+    .forecast-table {
+        display: block;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
     }
     
-    .forecast-table .date-cell {
-        width: 100px;
+    .forecast-table th,
+    .forecast-table td {
+        min-width: 120px;
     }
 }
 
@@ -527,25 +530,49 @@ input[type="range"] {
 }
 
 .airport-dot div {
-    transition: transform 0.2s ease-in-out;
+    transition: transform 0.2s ease-in-out, opacity 0.2s ease-in-out;
+    opacity: 1;
+    box-shadow: 0 0 4px rgba(0,0,0,0.5);
 }
 
 .airport-dot div:hover {
     transform: scale(1.5);
-    opacity: 1 !important;
+    opacity: 1;
+    box-shadow: 0 0 6px rgba(0,0,0,0.7);
 }
 
 .airport-tooltip {
     background-color: rgba(0, 0, 0, 0.8);
     border: none;
     border-radius: 4px;
-    padding: 4px 8px;
+    padding: 8px 12px;
     color: white;
     font-size: 12px;
-    font-weight: bold;
+    font-weight: 500;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    max-width: 300px;
+    white-space: pre-line;
+    line-height: 1.4;
 }
 
 .airport-tooltip::before {
     border-top-color: rgba(0, 0, 0, 0.8);
+}
+
+/* Improve visibility of cloud ceiling and wind information */
+.forecast-table td:nth-child(6),
+.forecast-table td:nth-child(7) {
+    font-family: monospace;
+    font-size: 13px;
+}
+
+/* Style for CLR and Unknown ceiling values */
+.forecast-table td:nth-child(7)[data-ceiling="CLR"] {
+    color: #27ae60;
+    font-weight: 500;
+}
+
+.forecast-table td:nth-child(7)[data-ceiling="Unknown"] {
+    color: #95a5a6;
+    font-weight: 500;
 } 

@@ -198,16 +198,11 @@ map.on('click', (e) => {
 // Function to get marker color based on flight category
 function getFlightCategoryColor(category) {
     switch (category) {
-        case 'VFR':
-            return '#00ff00';  // Green
-        case 'MVFR':
-            return '#0000ff';  // Blue
-        case 'IFR':
-            return '#ff0000';  // Red
-        case 'LIFR':
-            return '#ff00ff';  // Magenta
-        default:
-            return '#808080';  // Grey for unknown/no METAR
+        case 'VFR': return '#00ff00';  // Green
+        case 'MVFR': return '#0000ff'; // Blue
+        case 'IFR': return '#ff0000';  // Red
+        case 'LIFR': return '#ff00ff'; // Magenta
+        default: return '#808080';     // Grey
     }
 }
 
@@ -215,17 +210,31 @@ function getFlightCategoryColor(category) {
 function createDotIcon(color) {
     return L.divIcon({
         className: 'airport-dot',
-        html: `<div style="
-            background-color: ${color};
-            border: 2px solid #000;
-            border-radius: 50%;
-            width: 12px;
-            height: 12px;
-            opacity: 0.8;
-        "></div>`,
+        html: `<div style="background-color: ${color}; width: 12px; height: 12px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 4px rgba(0,0,0,0.5);"></div>`,
         iconSize: [12, 12],
         iconAnchor: [6, 6]
     });
+}
+
+function formatCeiling(ceiling_ft, ceiling_layer) {
+    if (ceiling_ft === null || ceiling_layer === null) {
+        return 'No ceiling';
+    }
+    return `${ceiling_layer} at ${ceiling_ft} ft`;
+}
+
+function formatVisibility(visibility_sm) {
+    if (visibility_sm === null) {
+        return 'Unknown visibility';
+    }
+    return `${visibility_sm} statute miles`;
+}
+
+function formatCloudLayers(layers) {
+    if (!layers || layers.length === 0) {
+        return 'Clear skies';
+    }
+    return layers.map(layer => `${layer.cover} at ${layer.base_ft} ft`).join('<br>');
 }
 
 // Function to fetch and display airports
@@ -269,10 +278,12 @@ async function fetchAirports(lat, lon) {
             console.log('Creating marker for airport:', airport);
             
             // Get color based on flight category
-            const color = getFlightCategoryColor(airport.flight_category);
+            const color = getFlightCategoryColor(airport.weather?.flight_category);
             
             // Create tooltip text
-            const tooltipText = airport.icao || airport.iata || airport.name;
+            const tooltipText = `${airport.name} (${airport.weather?.flight_category || 'Unknown'})
+${airport.weather?.ceiling_ft ? `Ceiling: ${formatCeiling(airport.weather?.ceiling_ft, airport.weather?.ceiling_layer)}` : airport.weather?.ceiling_layer === 'CLR' ? 'Ceiling: CLR' : 'No ceiling'}
+${airport.weather?.wind_speed_kt ? `Winds: ${airport.weather.wind_speed_kt}kt at ${airport.weather.wind_dir_degrees}°` : 'Winds: N/A'}`;
             
             // Create marker with colored dot
             const marker = L.marker([airport.lat, airport.lon], {
@@ -283,7 +294,10 @@ async function fetchAirports(lat, lon) {
                 ${airport.iata ? `IATA: ${airport.iata}<br>` : ''}
                 ${airport.icao ? `ICAO: ${airport.icao}<br>` : ''}
                 Type: ${airport.type}<br>
-                Flight Category: ${airport.flight_category || 'Unknown'}
+                Flight Category: ${airport.weather?.flight_category || 'Unknown'}<br>
+                ${airport.weather?.ceiling_ft ? `Ceiling: ${formatCeiling(airport.weather?.ceiling_ft, airport.weather?.ceiling_layer)}` : airport.weather?.ceiling_layer === 'CLR' ? 'Ceiling: CLR' : 'No ceiling'}<br>
+                Visibility: ${formatVisibility(airport.weather?.visibility_sm)}<br>
+                Cloud Layers:<br>${formatCloudLayers(airport.weather?.all_layers)}
             `)
             .bindTooltip(tooltipText, {
                 permanent: false,
@@ -410,7 +424,8 @@ function displayWeatherData(data) {
             <th>Temperature</th>
             <th>Wind</th>
             <th>Visibility</th>
-            <th>Clouds</th>
+            <th>Cloud Cover</th>
+            <th>Ceiling</th>
             <th>Pressure</th>
         </tr>
     `;
@@ -470,6 +485,10 @@ function displayWeatherData(data) {
         // Format cloud cover
         const cloudCover = data.daily.cloudcover_mean[index];
         const cloudStr = `${Math.round(cloudCover)}%`;
+
+        // Format ceiling based on cloud cover and cloud base
+        const cloudBase = data.daily.cloudbase_ft?.[index];
+        const ceilingStr = formatCeiling(cloudCover, cloudBase);
         
         // Format pressure (altimeter setting)
         const pressure = data.daily.pressure[index] || 29.92;  // Default to standard pressure if not available
@@ -482,6 +501,7 @@ function displayWeatherData(data) {
             <td>${windStr}</td>
             <td>${visibilityStr}</td>
             <td>${cloudStr}</td>
+            <td data-ceiling="${ceilingStr}">${ceilingStr}</td>
             <td>${pressureStr}</td>
         `;
         
@@ -547,4 +567,16 @@ async function handleAirportSearch() {
         const container = document.getElementById('forecast-container');
         container.innerHTML = `<div class="error-message">${error.message}</div>`;
     }
+}
+
+// Function to format ceiling for forecast table
+function formatCeiling(cloudCover, cloudBase) {
+    if (cloudBase && cloudBase > 0) {
+        return `${Math.round(cloudBase)} ft`;
+    } else if (cloudCover < 30) {  // Show CLR when cloud cover is low
+        return 'CLR';
+    } else if (cloudCover >= 30 && !cloudBase) {  // Show OVC when cloudy but no base data
+        return 'OVC';
+    }
+    return 'Unknown';
 } 
