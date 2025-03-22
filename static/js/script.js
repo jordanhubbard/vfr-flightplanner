@@ -167,7 +167,6 @@ daysSlider.addEventListener('input', function() {
 
 // Handle map clicks
 map.on('click', (e) => {
-    console.log('Map clicked at coordinates:', e.latlng);
     lastKnownPosition = e.latlng;
     
     // Update or create marker
@@ -186,11 +185,9 @@ map.on('click', (e) => {
     
     // Check if airports overlay is enabled
     const airportsEnabled = overlayCheckboxes.airports.checked;
-    console.log('Airports overlay enabled:', airportsEnabled);
     
     // Fetch airports if the overlay is enabled
     if (airportsEnabled) {
-        console.log('Fetching airports for coordinates:', lastKnownPosition);
         fetchAirports(lastKnownPosition.lat, lastKnownPosition.lng);
     }
 });
@@ -240,14 +237,11 @@ function formatCloudLayers(layers) {
 // Function to fetch and display airports
 async function fetchAirports(lat, lon) {
     try {
-        console.log(`Starting airport fetch for coordinates: ${lat}, ${lon}`);
-        
         const requestBody = {
             lat: lat,
             lon: lon,
             radius: 50  // 50km radius
         };
-        console.log('Sending request with body:', requestBody);
         
         const response = await fetch('/get_airports', {
             method: 'POST',
@@ -257,26 +251,19 @@ async function fetchAirports(lat, lon) {
             body: JSON.stringify(requestBody)
         });
         
-        console.log('Got response:', response.status, response.statusText);
-        
         if (!response.ok) {
             const errorData = await response.json();
             throw new Error(`Failed to fetch airports: ${errorData.details || errorData.error || response.statusText}`);
         }
         
         const data = await response.json();
-        console.log('Received airport data:', data);
         
         // Clear existing airport markers
-        console.log(`Clearing ${airportMarkers.length} existing markers`);
         airportMarkers.forEach(marker => map.removeLayer(marker));
         airportMarkers = [];
         
         // Add new airport markers
-        console.log(`Adding ${data.airports.length} new airport markers`);
         data.airports.forEach(airport => {
-            console.log('Creating marker for airport:', airport);
-            
             // Get color based on flight category
             const color = getFlightCategoryColor(airport.weather?.flight_category);
             
@@ -308,14 +295,11 @@ ${airport.weather?.wind_speed_kt ? `Winds: ${airport.weather.wind_speed_kt}kt at
             
             // Only add to map if airports overlay is checked
             if (overlayCheckboxes.airports.checked) {
-                console.log('Adding marker to map for:', airport.name);
                 marker.addTo(map);
             }
             
             airportMarkers.push(marker);
         });
-        
-        console.log(`Successfully added ${airportMarkers.length} airport markers`);
     } catch (error) {
         console.error('Error fetching airports:', error);
     }
@@ -333,13 +317,10 @@ const overlayCheckboxes = {
 // Add event listeners to all checkboxes
 Object.entries(overlayCheckboxes).forEach(([type, checkbox]) => {
     checkbox.addEventListener('change', (e) => {
-        console.log(`Overlay ${type} changed:`, e.target.checked);
         if (type === 'airports') {
             if (e.target.checked && lastKnownPosition) {
-                console.log('Airports overlay enabled, fetching airports for:', lastKnownPosition);
                 fetchAirports(lastKnownPosition.lat, lastKnownPosition.lng);
             } else {
-                console.log('Airports overlay disabled, removing markers');
                 airportMarkers.forEach(marker => map.removeLayer(marker));
             }
         } else {
