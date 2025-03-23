@@ -23,7 +23,7 @@ dev: check-env $(VENV)
 
 # Default target (production-like)
 run: check-env $(VENV)
-	. $(VENV)/bin/activate && FLASK_ENV=production FLASK_APP=app.py PORT=$(or $(PORT),5000) flask run -p $(or $(PORT),5000)
+	. $(VENV)/bin/activate && FLASK_ENV=production FLASK_APP=app.py PORT=$(or $(PORT),5000) flask run --host=0.0.0.0 -p $(or $(PORT),5000)
 
 # Create and setup virtual environment
 $(VENV):
