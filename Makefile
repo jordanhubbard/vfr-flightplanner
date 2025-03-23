@@ -19,7 +19,7 @@ check-env:
 # Development target with hot reloading
 dev: check-env $(VENV)
 	@echo "Starting development server with hot reloading..."
-	. $(VENV)/bin/activate && FLASK_ENV=development FLASK_DEBUG=1 FLASK_APP=app.py PORT=$(or $(PORT),5000) flask run -p $(or $(PORT),5000)
+	. $(VENV)/bin/activate && FLASK_ENV=development FLASK_DEBUG=1 FLASK_APP=app.py PORT=$(or $(PORT),5000) flask run --host=0.0.0.0 -p $(or $(PORT),5000)
 
 # Default target (production-like)
 run: check-env $(VENV)
