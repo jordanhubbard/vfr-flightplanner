@@ -988,4 +988,5 @@ def get_airport_coordinates():
         }), 500
 
 if __name__ == '__main__':
-    app.run(debug=True, use_reloader=True) 
+    port = int(os.getenv('PORT', 5000))
+    app.run(debug=True, use_reloader=True, host='0.0.0.0', port=port) 

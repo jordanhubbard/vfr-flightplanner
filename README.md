@@ -72,10 +72,20 @@ An interactive weather forecasting application that displays detailed weather in
 
 2. Start the Flask application:
    ```bash
+   # Run on default port 5000
    python app.py
+
+   # Or specify a custom port
+   PORT=8080 python app.py
+
+   # Using make:
+   make run            # Uses default port 5000
+   PORT=8080 make run  # Uses port 8080
    ```
 
-3. Open your browser and navigate to `http://localhost:5000`
+3. Open your browser and navigate to:
+   - Default: `http://localhost:5000`
+   - Custom port: `http://localhost:PORT` (replace PORT with your specified port number)
 
 ## Usage
 - **Map Selection**: Click anywhere on the map to get weather information for that location

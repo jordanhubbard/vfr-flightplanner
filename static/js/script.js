@@ -506,6 +506,13 @@ async function handleAirportSearch() {
     const airportCode = airportCodeInput.value.trim().toUpperCase();
     if (!airportCode) return;
 
+    // Basic validation for airport code format
+    if (!/^[A-Z0-9]{3,4}$/.test(airportCode)) {
+        const container = document.getElementById('forecast-container');
+        container.innerHTML = `<div class="error-message">Invalid airport code format. Please enter a 3 or 4 character code (e.g., SFO or KSFO).</div>`;
+        return;
+    }
+
     try {
         const response = await fetch('/get_airport_coordinates', {
             method: 'POST',
@@ -519,7 +526,7 @@ async function handleAirportSearch() {
 
         if (!response.ok) {
             const errorData = await response.json();
-            throw new Error(errorData.details || errorData.error || 'Failed to fetch airport coordinates');
+            throw new Error(errorData.details || errorData.error || `Airport "${airportCode}" not found. Please check the code and try again.`);
         }
 
         const data = await response.json();
@@ -543,10 +550,18 @@ async function handleAirportSearch() {
 
         // Clear the input
         airportCodeInput.value = '';
-    } catch (error) {
-        console.error('Error fetching airport coordinates:', error);
+
+        // Clear any previous error messages
         const container = document.getElementById('forecast-container');
-        container.innerHTML = `<div class="error-message">${error.message}</div>`;
+        if (container.querySelector('.error-message')) {
+            container.innerHTML = '';
+        }
+    } catch (error) {
+        const container = document.getElementById('forecast-container');
+        const errorMessage = error.message.includes('400 Client Error') ? 
+            `Airport "${airportCode}" not found. Please check the code and try again.` : 
+            error.message;
+        container.innerHTML = `<div class="error-message">${errorMessage}</div>`;
     }
 }
 
