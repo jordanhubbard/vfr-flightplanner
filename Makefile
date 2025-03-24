@@ -1,40 +1,46 @@
-.PHONY: run setup clean check-env dev
+.PHONY: setup run clean service-install service-remove service-start service-stop
 
-# Python virtual environment directory
-VENV := venv
-PYTHON := $(VENV)/bin/python
-PIP := $(VENV)/bin/pip
+# Default port for Flask app
+PORT ?= 5050
 
-# Check for required environment variables
-check-env:
-	@if [ ! -f .env ] && [ -z "$$OPENWEATHERMAP_API_KEY" ]; then \
-		echo "\033[31mError: OpenWeatherMap API key not found!\033[0m"; \
-		echo "Please either:"; \
-		echo "1. Create a .env file with OPENWEATHERMAP_API_KEY=your_api_key"; \
-		echo "2. Or set the OPENWEATHERMAP_API_KEY environment variable"; \
-		echo "\nGet your API key at: https://openweathermap.org/api"; \
-		exit 1; \
-	fi
+setup: venv
+	mkdir -p logs
 
-# Development target with hot reloading
-dev: check-env $(VENV)
-	@echo "Starting development server with hot reloading..."
-	. $(VENV)/bin/activate && FLASK_ENV=development FLASK_DEBUG=1 FLASK_APP=app.py PORT=$(or $(PORT),5000) flask run --host=0.0.0.0 -p $(or $(PORT),5000)
+venv:
+	python3 -m venv venv
+	. venv/bin/activate && pip install --upgrade pip
+	. venv/bin/activate && pip install -r requirements.txt
 
-# Default target (production-like)
-run: check-env $(VENV)
-	. $(VENV)/bin/activate && FLASK_ENV=production FLASK_APP=app.py PORT=$(or $(PORT),5000) flask run --host=0.0.0.0 -p $(or $(PORT),5000)
-
-# Create and setup virtual environment
-$(VENV):
-	python -m venv $(VENV)
-	$(PIP) install -r requirements.txt
-
-setup: $(VENV)
-
-# Clean up virtual environment and cache files
 clean:
-	rm -rf $(VENV)
-	find . -type d -name "__pycache__" -exec rm -rf {} +
-	find . -type f -name "*.pyc" -delete 
-	rm -f *.log
+	find . -type d -name "__pycache__" -exec rm -r {} +
+	find . -type f -name "*.pyc" -delete
+	find . -type f -name "*.pyo" -delete
+	find . -type f -name "*.pyd" -delete
+	find . -type f -name ".coverage" -delete
+	rm -f logs/*
+	rm -rf venv
+
+run: setup
+	. venv/bin/activate && \
+	FLASK_APP=app.py \
+	FLASK_DEBUG=1 \
+	FLASK_ENV=development \
+	PYTHONPATH=. \
+	python3 -m flask run --host=0.0.0.0 --port=$(PORT) --reload
+
+# Service management targets
+service-install:
+	sudo cp weather-forecasts.service /etc/systemd/system/
+	sudo systemctl daemon-reload
+	sudo systemctl enable weather-forecasts.service
+
+service-remove:
+	sudo systemctl disable weather-forecasts.service
+	sudo rm /etc/systemd/system/weather-forecasts.service
+	sudo systemctl daemon-reload
+
+service-start:
+	sudo systemctl start weather-forecasts.service
+
+service-stop:
+	sudo systemctl stop weather-forecasts.service
