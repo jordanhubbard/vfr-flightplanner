@@ -21,9 +21,9 @@ def create_app(config_class=DevelopmentConfig):
     app.config.from_object(config_class)
     
     # Register blueprints
-    from app.api.routes import api_bp
-    from app.main.routes import main_bp
-    
+    from app.controllers.api_controller import api_bp
+    from app.controllers.main_controller import main_bp
+
     app.register_blueprint(api_bp)
     app.register_blueprint(main_bp)
     

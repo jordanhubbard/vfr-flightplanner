@@ -4,7 +4,7 @@
 set -e
 
 # Default port
-PORT=${PORT:-5050}
+PORT=${PORT:-5060}
 
 # Print environment information
 echo "Starting Weather Forecasts application..."

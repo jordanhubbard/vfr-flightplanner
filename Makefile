@@ -1,7 +1,7 @@
 .PHONY: setup run clean test docker-build docker-run docker-stop docker-clean init test-data lint lint-fix deploy
 
 # Default port for Flask app
-PORT ?= 5050
+PORT ?= 5060
 
 # Setup virtual environment and install dependencies
 setup: venv
@@ -26,26 +26,18 @@ clean:
 deep-clean: clean
 	rm -rf venv
 
-# Run the application locally
-run: setup
-	. venv/bin/activate && \
-	FLASK_APP=run.py \
-	FLASK_DEBUG=1 \
-	FLASK_ENV=development \
-	PYTHONPATH=. \
-	python3 run.py
+# Run the application via Docker Compose
+run:
+	docker-compose up --build -d
+	@echo "Application started in Docker. Access it at http://localhost:$(PORT)"
 
-# Run tests
-test: setup
-	. venv/bin/activate && \
-	PYTHONPATH=. \
-	pytest tests/
+# Run tests inside Docker container
+test:
+	docker-compose exec web pytest tests/
 
-# Run tests with coverage
-test-cov: setup
-	. venv/bin/activate && \
-	PYTHONPATH=. \
-	pytest --cov=app tests/
+# Run tests with coverage inside Docker container
+test-cov:
+	docker-compose exec web pytest --cov=app tests/
 
 # Lint code
 lint: setup
@@ -64,11 +56,11 @@ docker-build:
 docker-run: docker-build
 	docker stop weather-forecasts-container 2>/dev/null || true
 	docker rm weather-forecasts-container 2>/dev/null || true
-	docker run -p $(PORT):$(PORT) \
+	docker run -p 5060:5060 \
 		--env-file .env \
 		--name weather-forecasts-container \
 		-d weather-forecasts
-	@echo "Container started. Access the application at http://localhost:$(PORT)"
+	@echo "Container started. Access the application at http://localhost:5060"
 
 docker-stop:
 	docker stop weather-forecasts-container || true
@@ -86,7 +78,7 @@ docker-clean: docker-stop
 # Docker Compose commands
 compose-up:
 	docker-compose up -d
-	@echo "Docker Compose services started. Access the application at http://localhost:$(PORT)"
+	@echo "Docker Compose services started. Access the application at http://localhost:5060"
 
 compose-down:
 	docker-compose down

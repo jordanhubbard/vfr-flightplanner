@@ -2,7 +2,7 @@
 # Docker container management script for Weather Forecasts application
 
 # Default values
-PORT=5050
+PORT=5060
 IMAGE_NAME="weather-forecasts"
 CONTAINER_NAME="weather-forecasts-container"
 
@@ -20,7 +20,7 @@ show_help() {
     echo "  help        Show this help message"
     echo ""
     echo "Options:"
-    echo "  -p, --port PORT    Port to expose (default: 5050)"
+    echo "  -p, --port PORT    Port to expose (default: 5060)"
     echo "  -h, --help         Show this help message"
     echo ""
     echo "Example:"

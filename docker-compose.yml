@@ -4,19 +4,19 @@ services:
   web:
     build: .
     ports:
-      - "${PORT:-5050}:${PORT:-5050}"
+      - "${PORT:-5060}:${PORT:-5060}"
     volumes:
       - ./app:/app/app
       - ./logs:/app/logs
     environment:
-      - PORT=${PORT:-5050}
+      - PORT=${PORT:-5060}
       - FLASK_ENV=${FLASK_ENV:-development}
       - PYTHONPATH=/app
     env_file:
       - .env
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:${PORT:-5050}/api/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:${PORT:-5060}/api/health"]
       interval: 30s
       timeout: 10s
       retries: 3

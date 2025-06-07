@@ -40,7 +40,7 @@ def test_weather_endpoint(client):
     """Test the weather endpoint with mocked data."""
     
     # Mock the get_weather_data function
-    with patch('app.api.routes.get_weather_data') as mock_weather:
+    with patch('app.controllers.api_controller.get_weather_data') as mock_weather:
         
         # Configure mock to return test data
         mock_data = {
@@ -109,7 +109,7 @@ def test_airports_endpoint(client):
     """Test the airports endpoint with mocked data."""
     
     # Mock the get_airports function
-    with patch('app.api.routes.get_airports') as mock_airports:
+    with patch('app.controllers.api_controller.get_airports') as mock_airports:
         
         # Configure mock to return test data
         mock_data = {
@@ -151,7 +151,7 @@ def test_airport_endpoint(client):
     """Test the airport endpoint with mocked data."""
     
     # Mock the get_airport_coordinates function
-    with patch('app.api.routes.get_airport_coordinates') as mock_airport:
+    with patch('app.controllers.api_controller.get_airport_coordinates') as mock_airport:
         
         # Configure mock to return test data
         mock_data = {

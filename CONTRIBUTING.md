@@ -13,7 +13,7 @@ weather-forecasts/
 │   ├── api/                # API endpoints
 │   │   ├── __init__.py
 │   │   └── routes.py       # API route definitions
-│   ├── main/               # Main routes
+│   ├── controllers/         # Controllers (route handlers, MVC)
 │   │   ├── __init__.py
 │   │   └── routes.py       # Main route definitions
 │   ├── models/             # Data models
@@ -153,6 +153,10 @@ For a list of all available make targets:
 ```bash
 make help
 ```
+
+## Important Note
+
+You must run the app in Docker (see README). Local Python execution is not supported.
 
 ## License
 

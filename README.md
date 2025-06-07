@@ -90,32 +90,28 @@ An interactive weather forecasting application that displays detailed weather in
 2. Build and run with Docker:
 
    ```bash
-   # Using docker directly
-   docker build -t weather-forecasts .
-   docker run -p 5050:5050 --env-file .env -d weather-forecasts
-   
-   # Or using docker-compose
+   # Using Docker Compose (recommended)
    docker-compose up -d
    ```
 
 ## Running the Application
 
-### Local Execution
+### Running the Application
 
-1. Make sure your virtual environment is activated (if using one)
+Running the application locally via Python/venv is no longer supported. Always use Docker Compose.
 
-2. Start the Flask application using make:
+1. Start the application using Docker Compose:
 
    ```bash
-   # Run on default port 5050
+   # Run on default port 5060 (Docker only)
    make run
 
    # Or specify a custom port
-   PORT=8080 make run
+   make run PORT=5070
    ```
 
-3. Open your browser and navigate to:
-   - Default: `http://localhost:5050`
+2. Open your browser and navigate to:
+   - Default: `http://localhost:5060`
    - Custom port: `http://localhost:PORT` (replace PORT with your specified port number)
 
 ### Docker Execution
@@ -138,7 +134,7 @@ An interactive weather forecasting application that displays detailed weather in
    make compose-down
    ```
 
-4. Open your browser and navigate to `http://localhost:5050`
+4. Open your browser and navigate to `http://localhost:5060`
 
 ## Usage
 
