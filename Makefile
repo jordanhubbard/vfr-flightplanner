@@ -49,6 +49,10 @@ lint-fix: setup
 	. venv/bin/activate && \
 	autopep8 --in-place --recursive app/ tests/
 
+# Show container logs
+logs:
+	docker-compose logs -f web
+
 # Docker commands
 docker-build:
 	docker build -t weather-forecasts .

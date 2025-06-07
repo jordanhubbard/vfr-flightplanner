@@ -18,4 +18,4 @@ if [ -z "${OPENWEATHERMAP_API_KEY}" ]; then
 fi
 
 # Run gunicorn with specified port
-exec gunicorn --bind 0.0.0.0:${PORT} --workers 2 --threads 4 --timeout 60 run:app
+exec gunicorn --bind 0.0.0.0:${PORT} --workers 2 --threads 4 --timeout 60 "app:create_app()"
