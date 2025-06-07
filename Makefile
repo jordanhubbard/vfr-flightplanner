@@ -1,16 +1,11 @@
 .PHONY: setup run clean test docker-build docker-run docker-stop docker-clean init test-data lint lint-fix deploy
 
 # Default port for Flask app
-PORT ?= 5060
+PORT ?= 8080
 
-# Setup virtual environment and install dependencies
-setup: venv
+# Setup logs directory (if needed)
+setup:
 	mkdir -p logs
-
-venv:
-	python3 -m venv venv
-	. venv/bin/activate && pip install --upgrade pip
-	. venv/bin/activate && pip install -r requirements.txt
 
 # Clean up project files
 clean:
@@ -64,7 +59,7 @@ docker-run: docker-build
 		--env-file .env \
 		--name weather-forecasts-container \
 		-d weather-forecasts
-	@echo "Container started. Access the application at http://localhost:5060"
+	@echo "Container started. Access the application at http://localhost:8080"
 
 docker-stop:
 	docker stop weather-forecasts-container || true
@@ -82,7 +77,7 @@ docker-clean: docker-stop
 # Docker Compose commands
 compose-up:
 	docker-compose up -d
-	@echo "Docker Compose services started. Access the application at http://localhost:5060"
+	@echo "Docker Compose services started. Access the application at http://localhost:8080"
 
 compose-down:
 	docker-compose down

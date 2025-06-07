@@ -5,7 +5,7 @@ WORKDIR /app
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PORT=5060 \
+    PORT=8080 \
     FLASK_ENV=production
 
 # Install system dependencies

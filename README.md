@@ -103,7 +103,7 @@ Running the application locally via Python/venv is no longer supported. Always u
 1. Start the application using Docker Compose:
 
    ```bash
-   # Run on default port 5060 (Docker only)
+   # Run on default port 8080 (Docker only)
    make run
 
    # Or specify a custom port
@@ -111,7 +111,7 @@ Running the application locally via Python/venv is no longer supported. Always u
    ```
 
 2. Open your browser and navigate to:
-   - Default: `http://localhost:5060`
+   - Default: `http://localhost:8080`
    - Custom port: `http://localhost:PORT` (replace PORT with your specified port number)
 
 ### Docker Execution
@@ -134,7 +134,7 @@ Running the application locally via Python/venv is no longer supported. Always u
    make compose-down
    ```
 
-4. Open your browser and navigate to `http://localhost:5060`
+4. Open your browser and navigate to `http://localhost:8080`
 
 ## Usage
 
