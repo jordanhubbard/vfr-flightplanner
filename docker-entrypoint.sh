@@ -19,6 +19,8 @@ fi
 
 # Update airport cache on container startup
 python3 scripts/update_airport_cache.py
+# Merge with OurAirports CSV for full coverage
+python3 scripts/merge_airport_datasets.py
 
 # Run gunicorn with specified port
 exec gunicorn --bind 0.0.0.0:${PORT} --workers 2 --threads 4 --timeout 60 "app:create_app()"

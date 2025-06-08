@@ -1,11 +1,10 @@
-.PHONY: setup run clean test docker-build docker-run docker-stop docker-clean init test-data lint lint-fix deploy
+.PHONY: setup run clean test docker-build docker-run docker-stop init test-data lint lint-fix deploy
 
 # Default port for Flask app
 PORT ?= 8080
 
 # Clean up project files
-clean: stop
-	docker compose down
+clean: docker-stop
 	@find . -type d -name "__pycache__" -exec rm -r {} +
 	@find . -type f -name "*.pyc" -delete
 	@find . -type f -name "*.pyo" -delete
@@ -13,9 +12,6 @@ clean: stop
 	@find . -type f -name ".coverage" -delete
 	@rm -f logs/*
 	@rm -rf .pytest_cache
-
-stop:
-	docker compose down -v --rmi all --remove-orphans || true
 
 # Run the application via Docker Compose
 run:
@@ -58,17 +54,11 @@ docker-run: docker-build
 	@echo "Container started. Access the application at http://localhost:8080"
 
 docker-stop:
-	docker stop weather-forecasts-container || true
-	docker rm weather-forecasts-container || true
+	docker compose down -v --rmi all --remove-orphans || true
 
 # Show Docker logs
 docker-logs:
 	docker logs -f weather-forecasts-container
-
-# Clean Docker resources
-docker-clean: docker-stop
-	docker rmi weather-forecasts || true
-	@echo "Docker resources cleaned"
 
 # Docker Compose commands
 compose-up:
@@ -115,7 +105,6 @@ help:
 	@echo "  docker-run  - Run application in Docker container"
 	@echo "  docker-stop - Stop Docker container"
 	@echo "  docker-logs - Show Docker container logs"
-	@echo "  docker-clean - Remove Docker container and image"
 	@echo "  compose-up  - Start application with Docker Compose"
 	@echo "  compose-down - Stop Docker Compose services"
 	@echo "  compose-logs - Show Docker Compose logs"
