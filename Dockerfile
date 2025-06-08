@@ -9,8 +9,14 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     FLASK_ENV=production
 
 # Install system dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    gcc \
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+       build-essential \
+       gcc \
+       libpq-dev \
+       python3-dev \
+       git \
+       curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first for better caching

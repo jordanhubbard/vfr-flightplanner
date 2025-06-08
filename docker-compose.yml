@@ -10,9 +10,11 @@ services:
       - PORT=8080
       - FLASK_ENV=${FLASK_ENV:-development}
       - PYTHONPATH=/app
+      - OPENWEATHERMAP_API_KEY=${OPENWEATHERMAP_API_KEY}
+      - OPENAIP_API_KEY=${OPENAIP_API_KEY}
+    restart: unless-stopped
     env_file:
       - .env
-    restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/api/health"]
       interval: 30s

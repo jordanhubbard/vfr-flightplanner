@@ -17,5 +17,8 @@ if [ -z "${OPENWEATHERMAP_API_KEY}" ]; then
     echo "Weather overlay features will be limited."
 fi
 
+# Update airport cache on container startup
+python3 scripts/update_airport_cache.py
+
 # Run gunicorn with specified port
 exec gunicorn --bind 0.0.0.0:${PORT} --workers 2 --threads 4 --timeout 60 "app:create_app()"

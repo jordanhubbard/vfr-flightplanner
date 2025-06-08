@@ -3,12 +3,9 @@
 # Default port for Flask app
 PORT ?= 8080
 
-# Setup logs directory (if needed)
-setup:
-	mkdir -p logs
-
 # Clean up project files
-clean:
+clean: stop
+	docker compose down
 	find . -type d -name "__pycache__" -exec rm -r {} +
 	find . -type f -name "*.pyc" -delete
 	find . -type f -name "*.pyo" -delete
@@ -17,9 +14,8 @@ clean:
 	rm -f logs/*
 	rm -rf .pytest_cache
 
-# Deep clean (includes venv)
-deep-clean: clean
-	rm -rf venv
+stop:
+	docker compose down -v --rmi all --remove-orphans || true
 
 # Run the application via Docker Compose
 run:

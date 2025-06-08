@@ -1,70 +1,61 @@
 import requests
 import logging
 import math
-import xml.etree.ElementTree as ET
+import os
 from datetime import datetime
+
+OPENAIP_API_KEY = os.getenv('OPENAIP_API_KEY')
+OPENAIP_API_URL = 'https://api.core.openaip.net/api/airports'
+
+HEADERS = {
+    'x-openaip-api-key': OPENAIP_API_KEY,
+    'Accept': 'application/json'
+}
 
 logger = logging.getLogger(__name__)
 
 def get_airports(lat, lon, radius=50):
     """
-    Get airports within a specified radius of a location.
-    
+    Get airports within a specified radius of a location using OpenAIP.
     Args:
         lat (float): Latitude
         lon (float): Longitude
-        radius (int): Search radius in miles (default: 50)
-        
+        radius (int): Search radius in kilometers (OpenAIP expects km)
     Returns:
         dict: Airport data
     """
     try:
-        # Ensure radius is within reasonable limits
-        radius = max(10, min(100, radius))
-        
-        # Call the FAA API to get airports
-        url = f"https://nfdc.faa.gov/nfdcApps/services/ajv5/airportSearch.jsp?lat={lat}&lon={lon}&radius={radius}"
-        response = requests.get(url, timeout=10)
+        radius_km = max(16, min(160, int(radius * 1.60934)))  # Convert miles to km, clamp to reasonable values
+        params = {
+            'lat': lat,
+            'lon': lon,
+            'radius': radius_km
+        }
+        response = requests.get(OPENAIP_API_URL, headers=HEADERS, params=params, timeout=10)
         response.raise_for_status()
-        
-        # Parse the XML response
-        root = ET.fromstring(response.content)
+        data = response.json()
         airports = []
-        
-        for airport in root.findall('.//Airport'):
-            try:
-                icao = airport.find('ICAO').text if airport.find('ICAO') is not None else None
-                
-                # Skip entries without ICAO code
-                if not icao:
-                    continue
-                    
-                # Extract airport data
-                airport_data = {
-                    'icao': icao,
-                    'name': airport.find('Name').text if airport.find('Name') is not None else 'Unknown',
-                    'city': airport.find('City').text if airport.find('City') is not None else '',
-                    'state': airport.find('State').text if airport.find('State') is not None else '',
-                    'latitude': float(airport.find('Lat').text) if airport.find('Lat') is not None else None,
-                    'longitude': float(airport.find('Lon').text) if airport.find('Lon') is not None else None,
-                    'elevation': int(float(airport.find('Elev').text)) if airport.find('Elev') is not None else None,
-                    'type': airport.find('Type').text if airport.find('Type') is not None else 'Unknown',
-                    'distance': float(airport.find('Distance').text) if airport.find('Distance') is not None else None
-                }
-                
-                # Get METAR data for this airport
+        for airport in data.get('items', []):
+            airport_data = {
+                'icao': airport.get('icao'),
+                'iata': airport.get('iata'),
+                'name': airport.get('name'),
+                'city': airport.get('city'),
+                'country': airport.get('country'),
+                'latitude': airport.get('lat'),
+                'longitude': airport.get('lon'),
+                'elevation': airport.get('elevation'),
+                'type': airport.get('type'),
+                'distance': airport.get('distance', None),
+            }
+            # Optionally, get METAR data if needed
+            icao = airport.get('icao')
+            if icao:
                 metar_data = get_metar_data([icao])
                 if icao in metar_data:
                     airport_data['metar'] = metar_data[icao]
-                    
-                airports.append(airport_data)
-            except Exception as e:
-                logger.error(f"Error processing airport data: {str(e)}")
-                continue
-                
-        # Sort airports by distance
+            airports.append(airport_data)
         airports.sort(key=lambda x: x.get('distance', float('inf')))
-        
         return {
             'count': len(airports),
             'airports': airports
@@ -74,65 +65,53 @@ def get_airports(lat, lon, radius=50):
         logger.error(f"Error fetching airport data: {str(e)}")
         return {'count': 0, 'airports': []}
 
+import json
+CACHE_PATH = os.path.join(os.path.dirname(__file__), 'airports_cache.json')
+
+_airport_cache = None
+
+def load_airport_cache():
+    global _airport_cache
+    if _airport_cache is None:
+        try:
+            with open(CACHE_PATH, 'r') as f:
+                _airport_cache = json.load(f)
+        except Exception as e:
+            logger.error(f"Error loading airport cache: {e}")
+            _airport_cache = []
+    return _airport_cache
+
 def get_airport_coordinates(code):
     """
-    Get coordinates for an airport by ICAO or IATA code.
-    
+    Get coordinates for an airport by ICAO or IATA code using local cache.
     Args:
         code (str): Airport code (ICAO or IATA)
-        
     Returns:
         dict: Airport location data
     """
-    try:
-        # Handle IATA codes (convert to ICAO if possible)
-        if len(code) == 3:
-            # Common prefix mapping for US airports
-            if code[0] in 'KLMNPQRSTUVWXYZ':
-                icao_code = 'K' + code
-            else:
-                # Try to look up the ICAO code from a service
-                icao_code = get_icao_from_iata(code)
-                if not icao_code:
-                    return None
-        else:
-            icao_code = code
-            
-        # Query the FAA API for airport data
-        url = f"https://nfdc.faa.gov/nfdcApps/services/ajv5/airportSearch.jsp?icao={icao_code}"
-        response = requests.get(url, timeout=10)
-        
-        if response.status_code != 200:
-            return None
-            
-        # Parse the XML response
-        root = ET.fromstring(response.content)
-        airport = root.find('.//Airport')
-        
-        if airport is None:
-            return None
-            
-        # Extract airport data
-        airport_data = {
-            'icao': icao_code,
-            'name': airport.find('Name').text if airport.find('Name') is not None else 'Unknown',
-            'city': airport.find('City').text if airport.find('City') is not None else '',
-            'state': airport.find('State').text if airport.find('State') is not None else '',
-            'latitude': float(airport.find('Lat').text) if airport.find('Lat') is not None else None,
-            'longitude': float(airport.find('Lon').text) if airport.find('Lon') is not None else None,
-            'elevation': int(float(airport.find('Elev').text)) if airport.find('Elev') is not None else None
-        }
-        
-        # Get METAR data
-        metar_data = get_metar_data([icao_code])
-        if icao_code in metar_data:
-            airport_data['metar'] = metar_data[icao_code]
-            
-        return airport_data
-        
-    except Exception as e:
-        logger.error(f"Error getting airport coordinates: {str(e)}")
-        return None
+    code = code.upper()
+    airports = load_airport_cache()
+    for airport in airports:
+        if airport.get('icao') == code or airport.get('iata') == code:
+            airport_data = {
+                'icao': airport.get('icao'),
+                'iata': airport.get('iata'),
+                'name': airport.get('name'),
+                'city': airport.get('city'),
+                'country': airport.get('country'),
+                'latitude': airport.get('lat'),
+                'longitude': airport.get('lon'),
+                'elevation': airport.get('elevation'),
+                'type': airport.get('type'),
+            }
+            icao = airport.get('icao')
+            if icao:
+                metar_data = get_metar_data([icao])
+                if icao in metar_data:
+                    airport_data['metar'] = metar_data[icao]
+            return airport_data
+    return None
+
 
 def get_icao_from_iata(iata_code):
     """
