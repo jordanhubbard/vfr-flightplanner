@@ -17,10 +17,23 @@ if [ -z "${OPENWEATHERMAP_API_KEY}" ]; then
     echo "Weather overlay features will be limited."
 fi
 
+# Use absolute path for OurAirports CSV
+AIRPORTS_CSV="/app/xctry-planner/backend/airports.csv"
+
 # Update airport cache on container startup
-python3 scripts/update_airport_cache.py
+python3 /app/scripts/update_airport_cache.py
+
+# Download OurAirports CSV if missing
+if [ ! -f "$AIRPORTS_CSV" ]; then
+  mkdir -p /app/xctry-planner/backend
+  curl -L -o "$AIRPORTS_CSV" https://ourairports.com/data/airports.csv
+fi
+
+# Debug: List the OurAirports CSV file
+ls -l "$AIRPORTS_CSV" || true
+
 # Merge with OurAirports CSV for full coverage
-python3 scripts/merge_airport_datasets.py
+python3 /app/scripts/merge_airport_datasets.py
 
 # Run gunicorn with specified port
 exec gunicorn --bind 0.0.0.0:${PORT} --workers 2 --threads 4 --timeout 60 "app:create_app()"
