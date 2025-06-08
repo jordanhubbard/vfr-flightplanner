@@ -6,13 +6,13 @@ PORT ?= 8080
 # Clean up project files
 clean: stop
 	docker compose down
-	find . -type d -name "__pycache__" -exec rm -r {} +
-	find . -type f -name "*.pyc" -delete
-	find . -type f -name "*.pyo" -delete
-	find . -type f -name "*.pyd" -delete
-	find . -type f -name ".coverage" -delete
-	rm -f logs/*
-	rm -rf .pytest_cache
+	@find . -type d -name "__pycache__" -exec rm -r {} +
+	@find . -type f -name "*.pyc" -delete
+	@find . -type f -name "*.pyo" -delete
+	@find . -type f -name "*.pyd" -delete
+	@find . -type f -name ".coverage" -delete
+	@rm -f logs/*
+	@rm -rf .pytest_cache
 
 stop:
 	docker compose down -v --rmi all --remove-orphans || true
