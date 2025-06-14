@@ -1,4 +1,4 @@
-.PHONY: setup run clean test docker-build docker-run docker-stop init test-data lint lint-fix deploy
+.PHONY: setup run clean test docker-build docker-run docker-stop init test-data lint lint-fix deploy logs
 
 # Default port for Flask app
 PORT ?= 8080
@@ -12,11 +12,25 @@ clean: docker-stop
 	@find . -type f -name ".coverage" -delete
 	@rm -f logs/*
 	@rm -rf .pytest_cache
+	# Remove all stale docker images for this application
+	-docker images --format '{{.Repository}}:{{.Tag}} {{.ID}}' | awk '/^weather-forecasts:/ {print $$2}' | xargs -r docker rmi
+
+# Update airport cache using Python script (run inside container)
+airport-cache:
+	docker-compose run --rm web python scripts/update_airport_cache.py
 
 # Run the application via Docker Compose
 run:
 	docker-compose up --build -d
 	@echo "Application started in Docker. Access it at http://localhost:$(PORT)"
+
+# Development: build and run container interactively with source mounted
+# Usage: make dev
+# This will start the container with a shell for debugging/development
+# You can override the shell with SHELL=/bin/bash make dev
+
+dev:
+	docker-compose run --rm --service-ports web /bin/bash
 
 # Run tests inside Docker container
 test:
@@ -36,13 +50,14 @@ lint-fix: setup
 	. venv/bin/activate && \
 	autopep8 --in-place --recursive app/ tests/
 
-# Show container logs
-logs:
-	docker-compose logs -f web
 
 # Docker commands
 docker-build:
 	docker build -t weather-forecasts .
+
+# Optimized multi-platform build using Docker Buildx Bake
+bake:
+	docker buildx bake --file docker-bake.hcl
 
 docker-run: docker-build
 	docker stop weather-forecasts-container 2>/dev/null || true
@@ -56,7 +71,15 @@ docker-run: docker-build
 docker-stop:
 	docker compose down -v --rmi all --remove-orphans || true
 
-# Show Docker logs
+# Restart all services (full container restart)
+restart:
+	docker-compose down
+	docker-compose up -d
+
+# Show container logs in real time
+logs:
+	docker-compose logs -f web
+
 docker-logs:
 	docker logs -f weather-forecasts-container
 
@@ -73,7 +96,7 @@ compose-logs:
 	docker-compose logs -f
 
 # Initialize the application
-init: setup
+init: setup airport-cache
 	@echo "Weather Forecasts application initialized"
 
 # Load test data (placeholder for future implementation)

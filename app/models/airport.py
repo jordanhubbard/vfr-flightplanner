@@ -5,10 +5,10 @@ import os
 from datetime import datetime
 
 OPENAIP_API_KEY = os.getenv('OPENAIP_API_KEY')
-OPENAIP_API_URL = 'https://api.core.openaip.net/api/airports'
+OPENAIP_API_URL = 'https://api.openaip.net/api/v4/airports'
 
 HEADERS = {
-    'x-openaip-api-key': OPENAIP_API_KEY,
+    'Authorization': f'Bearer {OPENAIP_API_KEY}',
     'Accept': 'application/json'
 }
 
@@ -25,6 +25,7 @@ def get_airports(lat, lon, radius=50):
         dict: Airport data
     """
     try:
+        logger.info(f"Starting OpenAIP airport data download for lat={lat}, lon={lon}, radius={radius}nm ({radius_km}km)")
         radius_km = max(16, min(160, int(radius * 1.60934)))  # Convert miles to km, clamp to reasonable values
         params = {
             'lat': lat,
@@ -35,7 +36,8 @@ def get_airports(lat, lon, radius=50):
         response.raise_for_status()
         data = response.json()
         airports = []
-        for airport in data.get('items', []):
+        # OpenAIP v4 returns airports in 'data' key, not 'items'
+        for airport in data.get('data', []):
             airport_data = {
                 'icao': airport.get('icao'),
                 'iata': airport.get('iata'),
@@ -56,6 +58,7 @@ def get_airports(lat, lon, radius=50):
                     airport_data['metar'] = metar_data[icao]
             airports.append(airport_data)
         airports.sort(key=lambda x: x.get('distance', float('inf')))
+        logger.info(f"Completed OpenAIP airport data download: found {len(airports)} airports.")
         return {
             'count': len(airports),
             'airports': airports

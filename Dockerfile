@@ -16,7 +16,6 @@ RUN apt-get update \
        libpq-dev \
        python3-dev \
        git \
-       curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first for better caching

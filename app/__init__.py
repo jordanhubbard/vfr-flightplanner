@@ -1,7 +1,11 @@
-from flask import Flask
-from app.config import DevelopmentConfig
 import os
 import logging
+from flask import Flask
+from app.config import DevelopmentConfig
+from .models import *
+
+# Ensure INFO logs are visible in Docker logs
+logging.basicConfig(level=logging.INFO)
 
 # Configure logging
 logging.basicConfig(

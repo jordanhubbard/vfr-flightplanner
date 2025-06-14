@@ -23,13 +23,12 @@ AIRPORTS_CSV="/app/xctry-planner/backend/airports.csv"
 # Update airport cache on container startup
 python3 /app/scripts/update_airport_cache.py
 
-# Download OurAirports CSV if missing
+# Fetch OurAirports CSV if missing (Python-based, robust)
 if [ ! -f "$AIRPORTS_CSV" ]; then
-  mkdir -p /app/xctry-planner/backend
-  curl -L -o "$AIRPORTS_CSV" https://ourairports.com/data/airports.csv
+  python3 /app/scripts/fetch_ourairports_csv.py
 fi
 
-# Debug: List the OurAirports CSV file
+# Debug: List the OurAirports CSV file (if present)
 ls -l "$AIRPORTS_CSV" || true
 
 # Merge with OurAirports CSV for full coverage
