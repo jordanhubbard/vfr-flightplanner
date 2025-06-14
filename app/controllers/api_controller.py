@@ -21,55 +21,85 @@ api_bp = Blueprint('api', __name__, url_prefix='/api')
 @api_bp.route('/health')
 def api_health():
     """Check health of all required APIs"""
-    with ThreadPoolExecutor(max_workers=2) as executor:
-        owm_future = executor.submit(check_owm_api)
-        meteo_future = executor.submit(check_meteo_api)
-        
-        owm_result = owm_future.result()
-        meteo_result = meteo_future.result()
-        
+    try:
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            owm_future = executor.submit(check_owm_api)
+            meteo_future = executor.submit(check_meteo_api)
+            
+            try:
+                owm_result = owm_future.result(timeout=10)
+            except Exception as e:
+                logger.error(f"OWM API check failed: {str(e)}")
+                owm_result = {
+                    'status': False,
+                    'error': 'Network connectivity issues',
+                    'timestamp': datetime.now().isoformat(),
+                    'api_calls': 0
+                }
+            
+            try:
+                meteo_result = meteo_future.result(timeout=10)
+            except Exception as e:
+                logger.error(f"Meteo API check failed: {str(e)}")
+                meteo_result = {
+                    'status': False,
+                    'error': 'Network connectivity issues',
+                    'timestamp': datetime.now().isoformat()
+                }
+            
+            return jsonify({
+                'openweathermap': owm_result,
+                'openmeteo': meteo_result,
+                'overall_status': 'degraded' if not (owm_result.get('status', False) or meteo_result.get('status', False)) else 'operational'
+            })
+    except Exception as e:
+        logger.error(f"Health check failed: {str(e)}")
         return jsonify({
-            'openweathermap': owm_result,
-            'openmeteo': meteo_result
-        })
+            'error': 'Health check failed',
+            'message': str(e),
+            'overall_status': 'error'
+        }), 500
 
 @api_bp.route('/weather', methods=['POST'])
 def get_weather():
     """Get weather forecast for specified coordinates"""
     try:
         data = request.get_json()
-        
-        # Extract parameters from request
+        if not data:
+            return jsonify({'error': 'No JSON data provided'}), 400
+            
         lat = data.get('lat')
         lon = data.get('lon')
-        days = data.get('days', 7)  # Default to 7 days if not specified
-        overlays = data.get('overlays', [])  # Get active overlays
+        days = data.get('days', 7)
+        overlays = data.get('overlays', [])
         
-        # Log request parameters
-        logger.info(f'Weather request for coordinates: {lat}, {lon} with {days} days forecast')
-        
-        if not all(isinstance(x, (int, float)) for x in [lat, lon]):
-            return jsonify({
-                'error': 'Invalid coordinates',
-                'message': 'Latitude and longitude must be valid numbers'
-            }), 400
+        if lat is None or lon is None:
+            return jsonify({'error': 'Missing required parameters: lat, lon'}), 400
             
-        if not isinstance(days, int) or days < 1 or days > 16:
-            return jsonify({
-                'error': 'Invalid days parameter',
-                'message': 'Days must be an integer between 1 and 16'
-            }), 400
+        # Validate coordinates
+        try:
+            lat = float(lat)
+            lon = float(lon)
+            days = int(days)
+        except (ValueError, TypeError):
+            return jsonify({'error': 'Invalid coordinate or days format'}), 400
             
-        # Get weather data from the weather model
+        if not (-90 <= lat <= 90) or not (-180 <= lon <= 180):
+            return jsonify({'error': 'Invalid coordinates'}), 400
+            
+        # Get weather data with fallback handling
         weather_data = get_weather_data(lat, lon, days, overlays)
         
+        if not weather_data:
+            return jsonify({'error': 'Failed to fetch weather data'}), 500
+            
         return jsonify(weather_data)
         
     except Exception as e:
         logger.error(f"Error in get_weather: {str(e)}")
         return jsonify({
-            'error': 'Server error',
-            'message': str(e)
+            'error': 'Internal server error',
+            'message': 'Weather service temporarily unavailable'
         }), 500
 
 @api_bp.route('/airports', methods=['GET'])
@@ -157,16 +187,27 @@ def metar():
 
 @api_bp.route('/plan_route', methods=['POST'])
 def plan_route_api():
-    """Plan a VFR route between two airports with terrain, VFR, and fuel stops."""
+    """Plan a VFR route between two airports with advanced fuel planning, terrain avoidance, and wind analysis."""
     try:
         data = request.get_json()
         from_code = data.get('from', '').strip().upper()
         to_code = data.get('to', '').strip().upper()
         aircraft_range = float(data.get('range', 400))
         groundspeed = float(data.get('groundspeed', 120))
+        
+        # New advanced parameters
+        fuel_capacity = float(data.get('fuel_capacity', 50))
+        fuel_burn_rate = float(data.get('fuel_burn_rate', 12))
+        avoid_terrain = bool(data.get('avoid_terrain', False))
+        plan_fuel_stops = bool(data.get('plan_fuel_stops', True))
+        cruising_altitude = int(data.get('cruising_altitude', 6500))
+        
         if not from_code or not to_code:
             return jsonify({'error': 'Missing required parameters'}), 400
-        route = plan_route(from_code, to_code, aircraft_range, groundspeed)
+            
+        route = plan_route(from_code, to_code, aircraft_range, groundspeed,
+                          fuel_capacity, fuel_burn_rate, avoid_terrain, plan_fuel_stops,
+                          cruising_altitude)
         if 'error' in route:
             return jsonify(route), 400
         return jsonify(route)

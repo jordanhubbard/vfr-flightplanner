@@ -16,6 +16,8 @@ RUN apt-get update \
        libpq-dev \
        python3-dev \
        git \
+       ca-certificates \
+    && update-ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first for better caching

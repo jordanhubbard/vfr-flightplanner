@@ -27,11 +27,15 @@ header h1 {
 }
 
 .controls {
-    background-color: white;
+    background: white;
     padding: 15px;
+    margin: 10px 0;
     border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    margin-bottom: 20px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    display: flex !important;
+    flex-wrap: wrap;
+    gap: 15px;
+    align-items: center;
 }
 
 .slider-container {
@@ -95,14 +99,38 @@ input[type="range"] {
     display: flex;
     gap: 8px;
     align-items: center;
-    margin-bottom: 5px;
+    margin-top: 2px;
+}
+
+.airport-search input {
+    padding: 4px 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 13px;
+    width: 120px;
+    text-transform: uppercase;
+}
+
+.airport-search button {
+    padding: 4px 12px;
+    background: #007bff;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 13px;
+    white-space: nowrap;
+}
+
+.airport-search button:hover {
+    background: #0056b3;
 }
 
 #airport-code {
-    padding: 6px 12px;
+    padding: 4px 8px;
     border: 1px solid #ddd;
     border-radius: 4px;
-    font-size: 14px;
+    font-size: 13px;
     width: 120px;
     text-transform: uppercase;
 }
@@ -114,18 +142,18 @@ input[type="range"] {
 }
 
 #go-airport {
-    padding: 6px 12px;
-    background-color: #007bff;
+    padding: 4px 12px;
+    background: #007bff;
     color: white;
     border: none;
     border-radius: 4px;
     cursor: pointer;
-    font-size: 14px;
-    transition: background-color 0.2s;
+    font-size: 13px;
+    white-space: nowrap;
 }
 
 #go-airport:hover {
-    background-color: #0056b3;
+    background: #0056b3;
 }
 
 #selected-location {
@@ -277,24 +305,44 @@ input[type="range"] {
     font-size: 1rem;
 }
 
+.control-group {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    min-width: 150px;
+}
+
+.control-group label {
+    font-weight: 600;
+    color: #333;
+    font-size: 14px;
+    margin-bottom: 2px;
+}
+
 .checkbox-group {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-    gap: 10px;
-    margin-bottom: 15px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 2px;
 }
 
 .checkbox-group label {
     display: flex;
     align-items: center;
-    gap: 8px;
-    cursor: pointer;
+    gap: 4px;
+    font-weight: normal;
+    font-size: 13px;
+    margin-bottom: 0;
 }
 
 .checkbox-group input[type="checkbox"] {
     width: 16px;
     height: 16px;
     cursor: pointer;
+}
+
+.checkbox-group input[type="checkbox"] {
+    margin: 0;
 }
 
 .overlay-opacity {
@@ -575,4 +623,222 @@ input[type="range"] {
 .forecast-table td:nth-child(7)[data-ceiling="Unknown"] {
     color: #95a5a6;
     font-weight: 500;
-} 
+}
+
+/* Flight Planning Form Enhancements */
+.form-row {
+    display: flex;
+    gap: 15px;
+    margin-bottom: 15px;
+    align-items: flex-end;
+}
+
+.form-group {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.form-group label {
+    margin-bottom: 5px;
+    font-weight: 500;
+    color: #2c3e50;
+}
+
+.form-group input {
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+.form-group input:focus {
+    outline: none;
+    border-color: #3498db;
+    box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
+}
+
+.checkbox-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.checkbox-group label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    cursor: pointer;
+}
+
+.checkbox-group input[type="checkbox"] {
+    margin: 0;
+}
+
+/* Flight Legs Table */
+#flight-legs-container {
+    margin-top: 20px;
+    background-color: white;
+    padding: 15px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+#flight-legs-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 10px;
+}
+
+#flight-legs-table th,
+#flight-legs-table td {
+    padding: 10px;
+    text-align: left;
+    border-bottom: 1px solid #ddd;
+}
+
+#flight-legs-table th {
+    background-color: #f8f9fa;
+    font-weight: 600;
+    color: #2c3e50;
+}
+
+#flight-legs-table tr:hover {
+    background-color: #f8f9fa;
+}
+
+/* Fuel Stop Row Styling */
+#flight-legs-table tr.fuel-stop {
+    background-color: #fff3cd;
+    border-left: 4px solid #ffc107;
+}
+
+#flight-legs-table tr.fuel-stop:hover {
+    background-color: #ffeaa7;
+}
+
+/* Flight Leg Row Styling */
+#flight-legs-table tr.flight-leg {
+    background-color: #d1ecf1;
+    border-left: 4px solid #17a2b8;
+}
+
+#flight-legs-table tr.flight-leg:hover {
+    background-color: #bee5eb;
+}
+
+/* Responsive Design for Form */
+@media (max-width: 768px) {
+    .form-row {
+        flex-direction: column;
+        gap: 10px;
+    }
+    
+    #flight-legs-table {
+        font-size: 12px;
+    }
+    
+    #flight-legs-table th,
+    #flight-legs-table td {
+        padding: 6px;
+    }
+}
+
+/* Weather forecast styling */
+.weather-header {
+    background: #2c3e50;
+    color: white;
+    padding: 15px;
+    border-radius: 8px 8px 0 0;
+    margin-bottom: 0;
+}
+
+.weather-header h2 {
+    margin: 0;
+    font-size: 1.2rem;
+}
+
+.current-weather {
+    background: #f8f9fa;
+    padding: 15px;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.current-weather h3 {
+    margin: 0 0 10px 0;
+    color: #2c3e50;
+    font-size: 1rem;
+}
+
+.hourly-forecast {
+    padding: 15px;
+}
+
+.hourly-forecast h3 {
+    margin: 0 0 15px 0;
+    color: #2c3e50;
+    font-size: 1rem;
+}
+
+.forecast-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 15px;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.forecast-item {
+    background: white;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    padding: 10px;
+    text-align: center;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.forecast-time {
+    font-weight: 600;
+    color: #2c3e50;
+    margin-bottom: 5px;
+}
+
+.forecast-temp {
+    font-size: 1.1rem;
+    color: #007bff;
+    margin-bottom: 8px;
+}
+
+.forecast-wind {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 30px;
+}
+
+.wind-detail {
+    align-items: center !important;
+}
+
+.wind-cell {
+    text-align: center;
+    vertical-align: middle;
+}
+
+/* Ensure controls remain horizontal */
+@media (max-width: 768px) {
+    .controls {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .control-group {
+        min-width: auto;
+    }
+    
+    .forecast-grid {
+        grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+        gap: 10px;
+    }
+}

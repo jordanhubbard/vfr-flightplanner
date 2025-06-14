@@ -3,6 +3,8 @@ import logging
 import math
 import os
 from datetime import datetime
+import json
+import xml.etree.ElementTree as ET
 
 OPENAIP_API_KEY = os.getenv('OPENAIP_API_KEY')
 OPENAIP_API_URL = 'https://api.openaip.net/api/v4/airports'
@@ -25,8 +27,8 @@ def get_airports(lat, lon, radius=50):
         dict: Airport data
     """
     try:
-        logger.info(f"Starting OpenAIP airport data download for lat={lat}, lon={lon}, radius={radius}nm ({radius_km}km)")
         radius_km = max(16, min(160, int(radius * 1.60934)))  # Convert miles to km, clamp to reasonable values
+        logger.info(f"Starting OpenAIP airport data download for lat={lat}, lon={lon}, radius={radius}nm ({radius_km}km)")
         params = {
             'lat': lat,
             'lon': lon,
@@ -68,7 +70,6 @@ def get_airports(lat, lon, radius=50):
         logger.error(f"Error fetching airport data: {str(e)}")
         return {'count': 0, 'airports': []}
 
-import json
 CACHE_PATH = os.path.join(os.path.dirname(__file__), 'airports_cache.json')
 
 _airport_cache = None
@@ -95,19 +96,30 @@ def get_airport_coordinates(code):
     code = code.upper()
     airports = load_airport_cache()
     for airport in airports:
-        if airport.get('icao') == code or airport.get('iata') == code:
+        # Handle both 'icao'/'icaoCode' and 'iata'/'iataCode' field name variations
+        icao_code = airport.get('icao') or airport.get('icaoCode')
+        iata_code = airport.get('iata') or airport.get('iataCode')
+        
+        if icao_code == code or iata_code == code:
+            # Handle coordinate field variations (lat/lon vs geometry.coordinates)
+            if 'geometry' in airport and 'coordinates' in airport['geometry']:
+                longitude, latitude = airport['geometry']['coordinates']
+            else:
+                latitude = airport.get('lat') or airport.get('latitude')
+                longitude = airport.get('lon') or airport.get('longitude')
+            
             airport_data = {
-                'icao': airport.get('icao'),
-                'iata': airport.get('iata'),
+                'icao': icao_code,
+                'iata': iata_code,
                 'name': airport.get('name'),
                 'city': airport.get('city'),
                 'country': airport.get('country'),
-                'latitude': airport.get('lat'),
-                'longitude': airport.get('lon'),
+                'latitude': latitude,
+                'longitude': longitude,
                 'elevation': airport.get('elevation'),
                 'type': airport.get('type'),
             }
-            icao = airport.get('icao')
+            icao = icao_code
             if icao:
                 metar_data = get_metar_data([icao])
                 if icao in metar_data:

@@ -12,7 +12,7 @@ if (initialLat !== null && initialLon !== null) {
 // Add OpenStreetMap tiles
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 19,
-    attribution: '© OpenStreetMap contributors'
+    attribution: ' OpenStreetMap contributors'
 }).addTo(map);
 
 // API Status elements
@@ -97,11 +97,8 @@ let currentMarker = null;
 let lastKnownPosition = null;
 let airportMarkers = [];  // Array to store airport markers
 const daysSlider = document.getElementById('forecast-days');
-const daysValue = document.getElementById('days-value');
 const opacitySlider = document.getElementById('overlay-opacity');
 const maxForecastDays = 16;  // Open-Meteo API limitation
-const airportCodeInput = document.getElementById('airport-code');
-const goAirportButton = document.getElementById('go-airport');
 
 // --- Flight Planner UI ---
 const flightPlanForm = document.getElementById('flight-plan-form');
@@ -123,12 +120,24 @@ flightPlanForm.addEventListener('submit', async function(e) {
     fuelStopMarkers.forEach(marker => map.removeLayer(marker));
     fuelStopMarkers = [];
     routeSummaryDiv.innerHTML = '';
+    
+    // Hide flight legs table initially
+    const flightLegsContainer = document.getElementById('flight-legs-container');
+    flightLegsContainer.style.display = 'none';
 
     const from = fromAirportInput.value.trim().toUpperCase();
     const to = toAirportInput.value.trim().toUpperCase();
     const range = parseFloat(aircraftRangeInput.value);
     const groundspeed = parseFloat(groundspeedInput.value);
-    if (!from || !to || isNaN(range) || isNaN(groundspeed)) {
+    
+    // Get new advanced parameters
+    const fuelCapacity = parseFloat(document.getElementById('fuel-capacity').value);
+    const fuelBurnRate = parseFloat(document.getElementById('fuel-burn-rate').value);
+    const avoidTerrain = document.getElementById('avoid-terrain').checked;
+    const planFuelStops = document.getElementById('plan-fuel-stops').checked;
+    const cruisingAltitude = parseInt(document.getElementById('cruising-altitude').value);
+    
+    if (!from || !to || isNaN(range) || isNaN(groundspeed) || isNaN(fuelCapacity) || isNaN(fuelBurnRate) || isNaN(cruisingAltitude)) {
         routeSummaryDiv.innerHTML = '<div class="error-message">All fields are required.</div>';
         return;
     }
@@ -137,7 +146,17 @@ flightPlanForm.addEventListener('submit', async function(e) {
         const response = await fetch('/api/plan_route', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ from, to, range, groundspeed })
+            body: JSON.stringify({ 
+                from, 
+                to, 
+                range, 
+                groundspeed,
+                fuel_capacity: fuelCapacity,
+                fuel_burn_rate: fuelBurnRate,
+                avoid_terrain: avoidTerrain,
+                plan_fuel_stops: planFuelStops,
+                cruising_altitude: cruisingAltitude
+            })
         });
         const data = await response.json();
         if (!response.ok || data.error) {
@@ -219,27 +238,330 @@ flightPlanForm.addEventListener('submit', async function(e) {
                     `</li>`;
             }).join('')}
         </ul></div>`;
+        // Show flight legs table
+        flightLegsContainer.style.display = 'block';
+        displayFlightLegsTable(data, fuelCapacity, fuelBurnRate);
+        
+        // Fetch weather data along the route
+        const routeWeatherData = await fetchRouteWeatherData(legs, cruisingAltitude);
+        console.log('Route weather data:', routeWeatherData);
+        
+        // Display route weather information in the flight legs table
+        displayFlightLegsTable(data, fuelCapacity, fuelBurnRate, routeWeatherData);
     } catch (error) {
-        routeSummaryDiv.innerHTML = `<div class=\"error-message\">${error.message}</div>`;
+        routeSummaryDiv.innerHTML = `<div class="error-message">${error.message}</div>`;
+    }
+});
+
+// Function to display flight legs table with fuel information
+function displayFlightLegsTable(routeData, fuelCapacity, fuelBurnRate, routeWeatherData = null) {
+    const flightLegsTableBody = document.getElementById('flight-legs-tbody');
+    flightLegsTableBody.innerHTML = '';
+    
+    let currentFuel = fuelCapacity;
+    let legNumber = 1;
+    
+    routeData.legs.forEach((leg, index) => {
+        // Calculate fuel consumption for this leg
+        const fuelUsed = leg.estimated_time_hr * fuelBurnRate;
+        currentFuel -= fuelUsed;
+        
+        // Check if this is a fuel stop (intermediate airport)
+        const isFuelStop = routeData.fuel_stops && routeData.fuel_stops.includes(leg.to);
+        
+        // Get weather information for this leg
+        let windInfo = 'N/A';
+        let windElement = null;
+        if (routeWeatherData) {
+            const legWeather = routeWeatherData.find(w => w.airport === leg.from || w.airport === leg.to);
+            if (legWeather && legWeather.weather && legWeather.weather.current) {
+                const current = legWeather.weather.current;
+                if (current.wind_speed_10m && current.wind_direction_10m) {
+                    const windSpeed = Math.round(current.wind_speed_10m * 1.94384); // Convert m/s to knots
+                    const windDir = Math.round(current.wind_direction_10m);
+                    windElement = getWindDisplayWithBarb(windSpeed, windDir);
+                    windInfo = `${windDir.toString().padStart(3, '0')}°/${windSpeed}kt`;
+                }
+            }
+        }
+        
+        // Fallback to placeholder if no real weather data
+        if (windInfo === 'N/A') {
+            windInfo = getWindDisplay(leg.cruise_altitude_ft || 6500);
+        }
+        
+        // Create flight leg row
+        const legRow = document.createElement('tr');
+        legRow.className = 'flight-leg';
+        legRow.innerHTML = `
+            <td>Leg ${legNumber}</td>
+            <td>${leg.from}</td>
+            <td>${leg.to}</td>
+            <td>${leg.distance_nm.toFixed(1)} nm</td>
+            <td>${leg.cruise_altitude_ft || 6500} ft</td>
+            <td>${(leg.estimated_time_hr * 60).toFixed(0)} min</td>
+            <td class="wind-cell"></td>
+            <td>${fuelUsed.toFixed(1)} gal</td>
+            <td>${currentFuel.toFixed(1)} gal</td>
+            <td>Flight</td>
+        `;
+        flightLegsTableBody.appendChild(legRow);
+        
+        // Add wind information to the wind cell
+        const windCell = legRow.querySelector('.wind-cell');
+        if (windElement) {
+            windCell.appendChild(windElement);
+        } else {
+            windCell.textContent = windInfo;
+        }
+        
+        // Add fuel stop row if this destination is a fuel stop
+        if (isFuelStop) {
+            const fuelStopRow = document.createElement('tr');
+            fuelStopRow.className = 'fuel-stop';
+            fuelStopRow.innerHTML = `
+                <td>Stop ${legNumber}</td>
+                <td colspan="2">${leg.to} - FUEL STOP</td>
+                <td>-</td>
+                <td>-</td>
+                <td>30 min</td>
+                <td>-</td>
+                <td>0.0 gal</td>
+                <td>${fuelCapacity.toFixed(1)} gal</td>
+                <td>Refuel</td>
+            `;
+            flightLegsTableBody.appendChild(fuelStopRow);
+            
+            // Reset fuel to full capacity after fuel stop
+            currentFuel = fuelCapacity;
+        }
+        
+        legNumber++;
+    });
+    
+    // Add summary row
+    const summaryRow = document.createElement('tr');
+    summaryRow.style.fontWeight = 'bold';
+    summaryRow.style.borderTop = '2px solid #333';
+    summaryRow.innerHTML = `
+        <td colspan="4">TOTAL</td>
+        <td>-</td>
+        <td>${(routeData.estimated_time_hr * 60).toFixed(0)} min</td>
+        <td>-</td>
+        <td>${(routeData.estimated_time_hr * fuelBurnRate).toFixed(1)} gal</td>
+        <td>-</td>
+        <td>Summary</td>
+    `;
+    flightLegsTableBody.appendChild(summaryRow);
+}
+
+// Function to get wind display (placeholder for wind barb visualization)
+function getWindDisplay(altitude) {
+    // This is a placeholder - in a real implementation, this would fetch actual wind data
+    // For now, return a simulated wind display
+    const windSpeed = Math.floor(Math.random() * 30) + 5; // 5-35 knots
+    const windDirection = Math.floor(Math.random() * 360); // 0-359 degrees
+    
+    return `${windDirection.toString().padStart(3, '0')}°/${windSpeed}kt`;
+}
+
+// Function to create wind barb SVG element
+function createWindBarb(windSpeed, windDirection, size = 30) {
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('width', size);
+    svg.setAttribute('height', size);
+    svg.setAttribute('viewBox', `0 0 ${size} ${size}`);
+    svg.style.display = 'inline-block';
+    svg.style.verticalAlign = 'middle';
+    
+    const centerX = size / 2;
+    const centerY = size / 2;
+    const lineLength = size * 0.4;
+    
+    // Convert wind direction to radians (wind direction is where wind is coming FROM)
+    const angleRad = (windDirection - 90) * Math.PI / 180;
+    
+    // Main wind direction line
+    const endX = centerX + Math.cos(angleRad) * lineLength;
+    const endY = centerY + Math.sin(angleRad) * lineLength;
+    
+    const mainLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    mainLine.setAttribute('x1', centerX);
+    mainLine.setAttribute('y1', centerY);
+    mainLine.setAttribute('x2', endX);
+    mainLine.setAttribute('y2', endY);
+    mainLine.setAttribute('stroke', '#333');
+    mainLine.setAttribute('stroke-width', '2');
+    svg.appendChild(mainLine);
+    
+    // Add wind speed barbs
+    let remainingSpeed = Math.round(windSpeed);
+    let barbPosition = 0.8; // Start near the end of the line
+    
+    // 50-knot pennants (triangular flags)
+    while (remainingSpeed >= 50) {
+        const barbX = centerX + Math.cos(angleRad) * lineLength * barbPosition;
+        const barbY = centerY + Math.sin(angleRad) * lineLength * barbPosition;
+        
+        const perpAngle = angleRad + Math.PI / 2;
+        const flagLength = size * 0.15;
+        
+        const flag = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+        const points = [
+            `${barbX},${barbY}`,
+            `${barbX + Math.cos(perpAngle) * flagLength},${barbY + Math.sin(perpAngle) * flagLength}`,
+            `${barbX + Math.cos(angleRad) * flagLength * 0.5},${barbY + Math.sin(angleRad) * flagLength * 0.5}`
+        ].join(' ');
+        flag.setAttribute('points', points);
+        flag.setAttribute('fill', '#333');
+        svg.appendChild(flag);
+        
+        remainingSpeed -= 50;
+        barbPosition -= 0.15;
+    }
+    
+    // 10-knot barbs (full lines)
+    while (remainingSpeed >= 10) {
+        const barbX = centerX + Math.cos(angleRad) * lineLength * barbPosition;
+        const barbY = centerY + Math.sin(angleRad) * lineLength * barbPosition;
+        
+        const perpAngle = angleRad + Math.PI / 2;
+        const barbLength = size * 0.12;
+        
+        const barb = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        barb.setAttribute('x1', barbX);
+        barb.setAttribute('y1', barbY);
+        barb.setAttribute('x2', barbX + Math.cos(perpAngle) * barbLength);
+        barb.setAttribute('y2', barbY + Math.sin(perpAngle) * barbLength);
+        barb.setAttribute('stroke', '#333');
+        barb.setAttribute('stroke-width', '2');
+        svg.appendChild(barb);
+        
+        remainingSpeed -= 10;
+        barbPosition -= 0.1;
+    }
+    
+    // 5-knot barbs (half lines)
+    if (remainingSpeed >= 5) {
+        const barbX = centerX + Math.cos(angleRad) * lineLength * barbPosition;
+        const barbY = centerY + Math.sin(angleRad) * lineLength * barbPosition;
+        
+        const perpAngle = angleRad + Math.PI / 2;
+        const barbLength = size * 0.06;
+        
+        const halfBarb = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        halfBarb.setAttribute('x1', barbX);
+        halfBarb.setAttribute('y1', barbY);
+        halfBarb.setAttribute('x2', barbX + Math.cos(perpAngle) * barbLength);
+        halfBarb.setAttribute('y2', barbY + Math.sin(perpAngle) * barbLength);
+        halfBarb.setAttribute('stroke', '#333');
+        halfBarb.setAttribute('stroke-width', '2');
+        svg.appendChild(halfBarb);
+    }
+    
+    // Add calm indicator for very light winds
+    if (windSpeed < 3) {
+        const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        circle.setAttribute('cx', centerX);
+        circle.setAttribute('cy', centerY);
+        circle.setAttribute('r', size * 0.1);
+        circle.setAttribute('fill', 'none');
+        circle.setAttribute('stroke', '#333');
+        circle.setAttribute('stroke-width', '2');
+        svg.appendChild(circle);
+    }
+    
+    return svg;
+}
+
+// Enhanced wind display function with barb visualization
+function getWindDisplayWithBarb(windSpeed, windDirection, altitude = null) {
+    const windText = `${windDirection.toString().padStart(3, '0')}°/${windSpeed}kt`;
+    const container = document.createElement('div');
+    container.style.display = 'flex';
+    container.style.alignItems = 'center';
+    container.style.gap = '5px';
+    
+    // Add wind barb
+    const windBarb = createWindBarb(windSpeed, windDirection, 25);
+    container.appendChild(windBarb);
+    
+    // Add text
+    const textSpan = document.createElement('span');
+    textSpan.textContent = windText;
+    textSpan.style.fontSize = '12px';
+    container.appendChild(textSpan);
+    
+    return container;
+}
+
+// Add area forecast functionality
+document.getElementById('area-forecast-btn').addEventListener('click', async function() {
+    const airportCode = document.getElementById('area-forecast-airport').value.trim().toUpperCase();
+    if (!airportCode) {
+        alert('Please enter an airport code');
+        return;
+    }
+    
+    try {
+        // Get airport coordinates
+        const airportResponse = await fetch(`/api/airport?code=${airportCode}`);
+        const airportData = await airportResponse.json();
+        
+        if (!airportResponse.ok) {
+            alert(`Airport ${airportCode} not found`);
+            return;
+        }
+        
+        // Center map on airport and show 50nm radius
+        const lat = airportData.latitude;
+        const lon = airportData.longitude;
+        map.setView([lat, lon], 9);
+        
+        // Add a circle to show 50nm radius
+        if (window.areaForecastCircle) {
+            map.removeLayer(window.areaForecastCircle);
+        }
+        
+        // Convert 50nm to meters (1 nautical mile = 1852 meters)
+        const radiusMeters = 50 * 1852;
+        window.areaForecastCircle = L.circle([lat, lon], {
+            radius: radiusMeters,
+            color: '#ff7800',
+            weight: 2,
+            fillColor: '#ff7800',
+            fillOpacity: 0.1
+        }).addTo(map);
+        
+        // Set the position for weather data fetching
+        lastKnownPosition = { lat: lat, lng: lon };
+        
+        // Fetch weather data for the area
+        await fetchWeatherData(lat, lon);
+        updateSelectedLocation(lat, lon);
+        
+    } catch (error) {
+        console.error('Error fetching area forecast:', error);
+        alert('Error fetching area forecast');
     }
 });
 
 // Weather overlay layers
 let weatherLayers = {
     clouds: L.tileLayer(`https://tile.openweathermap.org/map/clouds_new/{z}/{x}/{y}.png?appid=${API_KEY}`, {
-        attribution: '© OpenWeatherMap',
+        attribution: ' OpenWeatherMap',
         opacity: 0.7
     }),
     precipitation: L.tileLayer(`https://tile.openweathermap.org/map/precipitation_new/{z}/{x}/{y}.png?appid=${API_KEY}`, {
-        attribution: '© OpenWeatherMap',
+        attribution: ' OpenWeatherMap',
         opacity: 0.7
     }),
     wind: L.tileLayer(`https://tile.openweathermap.org/map/wind_new/{z}/{x}/{y}.png?appid=${API_KEY}`, {
-        attribution: '© OpenWeatherMap',
+        attribution: ' OpenWeatherMap',
         opacity: 0.7
     }),
     temp: L.tileLayer(`https://tile.openweathermap.org/map/temp_new/{z}/{x}/{y}.png?appid=${API_KEY}`, {
-        attribution: '© OpenWeatherMap',
+        attribution: ' OpenWeatherMap',
         opacity: 0.7
     })
 };
@@ -280,37 +602,25 @@ function getWeatherDescription(code) {
 // Update days value display and refresh data
 daysSlider.addEventListener('input', function() {
     const days = parseInt(this.value);
+    const daysValue = document.getElementById('days-value');
     daysValue.textContent = days;
     
-    // Fetch weather data
-    fetchWeatherData();
+    // Refresh weather data with new forecast period if we have a location
+    if (lastKnownPosition) {
+        fetchWeatherData(lastKnownPosition.lat, lastKnownPosition.lng, days);
+    }
 });
 
 // Handle map clicks
-map.on('click', (e) => {
-    lastKnownPosition = e.latlng;
+map.on('click', async function(e) {
+    const lat = e.latlng.lat;
+    const lon = e.latlng.lng;
     
-    // Update or create marker
-    if (currentMarker) {
-        currentMarker.setLatLng(lastKnownPosition);
-    } else {
-        currentMarker = L.marker(lastKnownPosition).addTo(map);
-    }
+    // Update location display and marker
+    updateSelectedLocation(lat, lon);
     
-    // Update location text
-    const locationText = document.getElementById('selected-location');
-    locationText.textContent = `Selected Location: ${lastKnownPosition.lat.toFixed(4)}°N, ${lastKnownPosition.lng.toFixed(4)}°W`;
-    
-    // Get weather data for the location
-    fetchWeatherData();
-    
-    // Check if airports overlay is enabled
-    const airportsEnabled = overlayCheckboxes.airports.checked;
-    
-    // Fetch airports if the overlay is enabled
-    if (airportsEnabled) {
-        fetchAirports(lastKnownPosition.lat, lastKnownPosition.lng);
-    }
+    // Fetch weather data for the clicked location
+    await fetchWeatherData(lat, lon);
 });
 
 // Function to get marker color based on flight category
@@ -435,20 +745,29 @@ const overlayCheckboxes = {
     airports: document.getElementById('airports-overlay')
 };
 
-// Add event listeners to all checkboxes
 Object.entries(overlayCheckboxes).forEach(([type, checkbox]) => {
-    checkbox.addEventListener('change', (e) => {
-        if (type === 'airports') {
-            if (e.target.checked && lastKnownPosition) {
-                fetchAirports(lastKnownPosition.lat, lastKnownPosition.lng);
+    if (checkbox) {
+        checkbox.addEventListener('change', function(e) {
+            if (type === 'airports') {
+                // Handle airports overlay specially
+                if (e.target.checked && lastKnownPosition) {
+                    fetchAirports(lastKnownPosition.lat, lastKnownPosition.lng);
+                } else if (!e.target.checked) {
+                    // Clear airport markers when disabled
+                    airportMarkers.forEach(marker => map.removeLayer(marker));
+                    airportMarkers = [];
+                }
             } else {
-                airportMarkers.forEach(marker => map.removeLayer(marker));
+                // Handle weather overlays
+                toggleOverlay(type, e.target.checked);
+                
+                // Refresh weather data if we have a location
+                if (lastKnownPosition) {
+                    fetchWeatherData(lastKnownPosition.lat, lastKnownPosition.lng);
+                }
             }
-        } else {
-            toggleOverlay(type, e.target.checked);
-            fetchWeatherData();
-        }
-    });
+        });
+    }
 });
 
 // Handle opacity changes
@@ -472,217 +791,132 @@ function toggleOverlay(type, show) {
 }
 
 // Function to refresh weather data
-async function fetchWeatherData() {
-    if (!lastKnownPosition) {
-        return;
+async function fetchWeatherData(lat = null, lon = null, days = null) {
+    // Use provided parameters or fall back to current position and slider values
+    const targetLat = lat || (lastKnownPosition ? lastKnownPosition.lat : null);
+    const targetLon = lon || (lastKnownPosition ? lastKnownPosition.lng : null);
+    const forecastDays = days || parseInt(daysSlider.value);
+    
+    if (!targetLat || !targetLon) {
+        console.warn('No coordinates available for weather fetch');
+        return null;
     }
     
     try {
-        const days = parseInt(daysSlider.value);
-        
         const response = await fetch('/get_weather', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-                lat: lastKnownPosition.lat,
-                lon: lastKnownPosition.lng,
-                days: Math.min(days, maxForecastDays),  // Ensure we don't exceed the API limit
-                overlays: Object.entries(overlayCheckboxes)
-                    .filter(([_, checkbox]) => checkbox.checked)
-                    .map(([type]) => type)
-            })
+                lat: targetLat,
+                lon: targetLon,
+                days: Math.min(forecastDays, maxForecastDays),  // Ensure we don't exceed the API limit
+            }),
         });
-        
+
         if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.details || errorData.error || 'Failed to fetch weather data');
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        
+        // Only update the display if this is for the current position
+        if (!lat && !lon) {
+            displayWeatherData(data);
         }
         
-        const data = await response.json();
-        displayWeatherData(data);
+        return data;
     } catch (error) {
         console.error('Error fetching weather data:', error);
-        const container = document.getElementById('forecast-container');
-        container.innerHTML = `<div class="error-message">${error.message}</div>`;
+        
+        // Only show error in UI if this is for the current position
+        if (!lat && !lon) {
+            const weatherContainer = document.getElementById('weather-info');
+            if (weatherContainer) {
+                weatherContainer.innerHTML = '<div class="error-message">Failed to load weather data. Please try again.</div>';
+            }
+        }
+        
+        return null;
     }
 }
 
 // Display weather data in the forecast container
 function displayWeatherData(data) {
-    const container = document.getElementById('forecast-container');
-    container.innerHTML = '';
+    const container = document.getElementById('weather-info');
+    if (!container) return;
+
+    let html = '<div class="weather-header"><h2>Weather Forecast</h2></div>';
     
-    // Create table header
-    const table = document.createElement('table');
-    table.className = 'forecast-table';
+    if (data.current) {
+        const current = data.current;
+        html += '<div class="current-weather">';
+        html += '<h3>Current Conditions</h3>';
+        html += '<div class="weather-details">';
+        html += `<div class="weather-detail"><strong>Temperature:</strong> ${Math.round(current.temperature_2m)}°C</div>`;
+        html += `<div class="weather-detail"><strong>Humidity:</strong> ${Math.round(current.relative_humidity_2m)}%</div>`;
+        html += `<div class="weather-detail"><strong>Pressure:</strong> ${Math.round(current.surface_pressure)} hPa</div>`;
+        html += `<div class="weather-detail"><strong>Cloud Cover:</strong> ${Math.round(current.cloud_cover)}%</div>`;
+        
+        // Add wind information with barb
+        if (current.wind_speed_10m && current.wind_direction_10m) {
+            const windSpeed = Math.round(current.wind_speed_10m * 1.94384); // Convert m/s to knots
+            const windDir = Math.round(current.wind_direction_10m);
+            html += `<div class="weather-detail wind-detail"><strong>Wind:</strong> <span id="current-wind-display"></span></div>`;
+        }
+        
+        html += '</div></div>';
+    }
+
+    if (data.hourly && data.hourly.time) {
+        html += '<div class="hourly-forecast">';
+        html += '<h3>Hourly Forecast</h3>';
+        html += '<div class="forecast-grid">';
+        
+        const maxHours = Math.min(24, data.hourly.time.length);
+        for (let i = 0; i < maxHours; i += 3) { // Show every 3 hours
+            const time = new Date(data.hourly.time[i]);
+            const temp = Math.round(data.hourly.temperature_2m[i]);
+            const windSpeed = data.hourly.wind_speed_10m ? Math.round(data.hourly.wind_speed_10m[i] * 1.94384) : 0;
+            const windDir = data.hourly.wind_direction_10m ? Math.round(data.hourly.wind_direction_10m[i]) : 0;
+            
+            html += '<div class="forecast-item">';
+            html += `<div class="forecast-time">${time.getHours().toString().padStart(2, '0')}:00</div>`;
+            html += `<div class="forecast-temp">${temp}°C</div>`;
+            html += `<div class="forecast-wind" id="wind-${i}"></div>`;
+            html += '</div>';
+        }
+        
+        html += '</div></div>';
+    }
+
+    container.innerHTML = html;
     
-    const thead = document.createElement('thead');
-    thead.innerHTML = `
-        <tr>
-            <th>Date</th>
-            <th>Conditions</th>
-            <th>Temperature</th>
-            <th>Wind</th>
-            <th>Visibility</th>
-            <th>Cloud Cover</th>
-            <th>Ceiling</th>
-            <th>Pressure</th>
-        </tr>
-    `;
-    table.appendChild(thead);
+    // Add wind barbs to current conditions
+    if (data.current && data.current.wind_speed_10m && data.current.wind_direction_10m) {
+        const windSpeed = Math.round(data.current.wind_speed_10m * 1.94384);
+        const windDir = Math.round(data.current.wind_direction_10m);
+        const currentWindDisplay = document.getElementById('current-wind-display');
+        if (currentWindDisplay) {
+            const windElement = getWindDisplayWithBarb(windSpeed, windDir);
+            currentWindDisplay.appendChild(windElement);
+        }
+    }
     
-    // Create table body
-    const tbody = document.createElement('tbody');
-    
-    // Process each day's data
-    data.daily.time.forEach((date, index) => {
-        const row = document.createElement('tr');
-        
-        // Format date
-        const formattedDate = new Date(date).toLocaleDateString('en-US', {
-            weekday: 'short',
-            month: 'short',
-            day: 'numeric'
-        });
-        
-        // Get weather description
-        const weatherCode = data.daily.weathercode[index];
-        const weatherDesc = getWeatherDescription(weatherCode);
-        
-        // Format temperature
-        const tempMax = data.daily.temperature_2m_max[index];
-        const tempMin = data.daily.temperature_2m_min[index];
-        const tempStr = `${Math.round(tempMax)}°F / ${Math.round(tempMin)}°F`;
-        
-        // Format wind (including direction and gusts)
-        const windSpeed = data.daily.windspeed_10m_max[index];
-        const windDir = data.daily.winddirection_10m_dominant[index];
-        const windGust = data.daily.windgusts_10m_max[index];
-        
-        // Calculate wind trend
-        let windTrend = '';
-        if (index > 0) {
-            const prevWindGust = data.daily.windgusts_10m_max[index - 1];
-            const gustDiff = windGust - prevWindGust;
-            if (Math.abs(gustDiff) > 5) {  // Only show trend if change is significant
-                windTrend = gustDiff > 0 ? '↑' : '↓';
+    // Add wind barbs to hourly forecast
+    if (data.hourly && data.hourly.time) {
+        const maxHours = Math.min(24, data.hourly.time.length);
+        for (let i = 0; i < maxHours; i += 3) {
+            const windSpeed = data.hourly.wind_speed_10m ? Math.round(data.hourly.wind_speed_10m[i] * 1.94384) : 0;
+            const windDir = data.hourly.wind_direction_10m ? Math.round(data.hourly.wind_direction_10m[i]) : 0;
+            
+            const windElement = document.getElementById(`wind-${i}`);
+            if (windElement && windSpeed > 0) {
+                const windBarb = getWindDisplayWithBarb(windSpeed, windDir);
+                windElement.appendChild(windBarb);
             }
         }
-        
-        // Add wind advisory if gusts are significant
-        let windAdvisory = '';
-        if (windGust > 25) {
-            windAdvisory = '<span class="wind-advisory">Strong winds expected</span>';
-        }
-        
-        const windStr = `${Math.round(windSpeed)}kt ${Math.round(windDir)}°${windGust ? ` (${Math.round(windGust)}kt gusts${windTrend})` : ''} ${windAdvisory}`;
-        
-        // Format visibility (convert meters to miles)
-        const visibility = data.daily.visibility_mean[index];
-        const visibilityMiles = (visibility / 1609.34).toFixed(1);  // Convert meters to miles
-        const visibilityStr = `${visibilityMiles}mi`;
-        
-        // Format cloud cover
-        const cloudCover = data.daily.cloudcover_mean[index];
-        const cloudStr = `${Math.round(cloudCover)}%`;
-
-        // Format ceiling based on cloud cover and cloud base
-        const cloudBase = data.daily.cloudbase_ft?.[index];
-        const ceilingStr = formatCeiling(cloudCover, cloudBase);
-        
-        // Format pressure (altimeter setting)
-        const pressure = data.daily.pressure[index] || 29.92;  // Default to standard pressure if not available
-        const pressureStr = `${pressure.toFixed(2)}" Hg`;
-        
-        row.innerHTML = `
-            <td>${formattedDate}</td>
-            <td>${weatherDesc}</td>
-            <td>${tempStr}</td>
-            <td>${windStr}</td>
-            <td>${visibilityStr}</td>
-            <td>${cloudStr}</td>
-            <td data-ceiling="${ceilingStr}">${ceilingStr}</td>
-            <td>${pressureStr}</td>
-        `;
-        
-        tbody.appendChild(row);
-    });
-    
-    table.appendChild(tbody);
-    container.appendChild(table);
-}
-
-// Add event listener for airport code search
-goAirportButton.addEventListener('click', handleAirportSearch);
-airportCodeInput.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') {
-        handleAirportSearch();
-    }
-});
-
-// Function to handle airport code search
-async function handleAirportSearch() {
-    const airportCode = airportCodeInput.value.trim().toUpperCase();
-    if (!airportCode) return;
-
-    // Basic validation for airport code format
-    if (!/^[A-Z0-9]{3,4}$/.test(airportCode)) {
-        const container = document.getElementById('forecast-container');
-        container.innerHTML = `<div class="error-message">Invalid airport code format. Please enter a 3 or 4 character code (e.g., SFO or KSFO).</div>`;
-        return;
-    }
-
-    try {
-        const response = await fetch('/get_airport_coordinates', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                airport_code: airportCode
-            })
-        });
-
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.details || errorData.error || `Airport "${airportCode}" not found. Please check the code and try again.`);
-        }
-
-        const data = await response.json();
-        
-        // Update map view and marker
-        map.setView([data.lat, data.lon], 10);
-        lastKnownPosition = { lat: data.lat, lng: data.lon };
-        
-        if (currentMarker) {
-            currentMarker.setLatLng(lastKnownPosition);
-        } else {
-            currentMarker = L.marker(lastKnownPosition).addTo(map);
-        }
-
-        // Update location text
-        const locationText = document.getElementById('selected-location');
-        locationText.textContent = `${airportCode}: ${data.lat.toFixed(4)}°N, ${data.lon.toFixed(4)}°W`;
-
-        // Fetch weather data
-        fetchWeatherData();
-
-        // Clear the input
-        airportCodeInput.value = '';
-
-        // Clear any previous error messages
-        const container = document.getElementById('forecast-container');
-        if (container.querySelector('.error-message')) {
-            container.innerHTML = '';
-        }
-    } catch (error) {
-        const container = document.getElementById('forecast-container');
-        const errorMessage = error.message.includes('400 Client Error') ? 
-            `Airport "${airportCode}" not found. Please check the code and try again.` : 
-            error.message;
-        container.innerHTML = `<div class="error-message">${errorMessage}</div>`;
     }
 }
 
@@ -697,3 +931,98 @@ function formatCeiling(cloudCover, cloudBase) {
     }
     return 'Unknown';
 } 
+
+// Function to update selected location display
+function updateSelectedLocation(lat, lon) {
+    const locationText = document.getElementById('selected-location');
+    if (locationText) {
+        locationText.textContent = `Selected Location: ${lat.toFixed(4)}°N, ${lon.toFixed(4)}°W`;
+    }
+    
+    // Update global position for backward compatibility
+    lastKnownPosition = { lat: lat, lng: lon };
+    
+    // Update marker position
+    if (currentMarker) {
+        currentMarker.setLatLng([lat, lon]);
+    } else {
+        currentMarker = L.marker([lat, lon]).addTo(map);
+    }
+    
+    // Fetch airports if overlay is enabled
+    const airportsCheckbox = document.getElementById('airports-overlay');
+    if (airportsCheckbox && airportsCheckbox.checked) {
+        fetchAirports(lat, lon);
+    }
+}
+
+// Function to fetch weather data along a flight route
+async function fetchRouteWeatherData(routeLegs, cruisingAltitude = 6500) {
+    const weatherData = [];
+    
+    for (const leg of routeLegs) {
+        try {
+            // Fetch weather for departure airport
+            const depResponse = await fetch(`/api/airport?code=${leg.from}`);
+            const depAirport = await depResponse.json();
+            
+            if (depResponse.ok) {
+                const depWeather = await fetchWeatherData(depAirport.latitude, depAirport.longitude, 1);
+                if (depWeather) {
+                    weatherData.push({
+                        airport: leg.from,
+                        name: depAirport.name,
+                        lat: depAirport.latitude,
+                        lon: depAirport.longitude,
+                        weather: depWeather,
+                        type: 'departure'
+                    });
+                }
+            }
+            
+            // Fetch weather for arrival airport
+            const arrResponse = await fetch(`/api/airport?code=${leg.to}`);
+            const arrAirport = await arrResponse.json();
+            
+            if (arrResponse.ok) {
+                const arrWeather = await fetchWeatherData(arrAirport.latitude, arrAirport.longitude, 1);
+                if (arrWeather) {
+                    weatherData.push({
+                        airport: leg.to,
+                        name: arrAirport.name,
+                        lat: arrAirport.latitude,
+                        lon: arrAirport.longitude,
+                        weather: arrWeather,
+                        type: 'arrival'
+                    });
+                }
+            }
+            
+            // Fetch weather at 20nm intervals along the leg (for future enhancement)
+            const numIntervals = Math.max(1, Math.floor(leg.distance_nm / 20));
+            for (let i = 1; i < numIntervals; i++) {
+                const fraction = i / numIntervals;
+                const intermediateLat = depAirport.latitude + (arrAirport.latitude - depAirport.latitude) * fraction;
+                const intermediateLon = depAirport.longitude + (arrAirport.longitude - depAirport.longitude) * fraction;
+                
+                const intermediateWeather = await fetchWeatherData(intermediateLat, intermediateLon, 1);
+                if (intermediateWeather) {
+                    weatherData.push({
+                        airport: `${leg.from}-${leg.to}-${i}`,
+                        name: `Waypoint ${i}`,
+                        lat: intermediateLat,
+                        lon: intermediateLon,
+                        weather: intermediateWeather,
+                        type: 'waypoint',
+                        distance_from_departure: leg.distance_nm * fraction
+                    });
+                }
+            }
+            
+        } catch (error) {
+            console.error(`Error fetching weather for leg ${leg.from} to ${leg.to}:`, error);
+        }
+    }
+    
+    return weatherData;
+}

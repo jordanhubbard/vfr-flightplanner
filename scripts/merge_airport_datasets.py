@@ -16,9 +16,19 @@ def load_openaip():
         return json.load(f)
 
 # Load OurAirports CSV (https://ourairports.com/data/airports.csv)
+def find_ourairports_csv():
+    # Allow override via environment variable
+    path = os.environ.get('OURAIRPORTS_CSV', '/app/xctry-planner/backend/airports.csv')
+    if not os.path.exists(path):
+        print(f"[merge_airport_datasets.py] OurAirports CSV not found at {path}.")
+    return path
+
 def load_ourairports():
     airports = []
     csv_path = find_ourairports_csv()
+    if not os.path.exists(csv_path):
+        print(f"[merge_airport_datasets.py] ERROR: OurAirports CSV does not exist at {csv_path}.")
+        return airports
     with open(csv_path, newline='', encoding='utf-8') as csvfile:
         reader = csv.DictReader(csvfile)
         for row in reader:
