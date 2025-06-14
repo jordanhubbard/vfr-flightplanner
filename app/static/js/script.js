@@ -103,6 +103,127 @@ const maxForecastDays = 16;  // Open-Meteo API limitation
 const airportCodeInput = document.getElementById('airport-code');
 const goAirportButton = document.getElementById('go-airport');
 
+// --- Flight Planner UI ---
+const flightPlanForm = document.getElementById('flight-plan-form');
+const fromAirportInput = document.getElementById('from-airport');
+const toAirportInput = document.getElementById('to-airport');
+const aircraftRangeInput = document.getElementById('aircraft-range');
+const groundspeedInput = document.getElementById('groundspeed');
+const routeSummaryDiv = document.getElementById('route-summary');
+let routePolyline = null;
+let fuelStopMarkers = [];
+
+flightPlanForm.addEventListener('submit', async function(e) {
+    e.preventDefault();
+    // Clear previous route
+    if (routePolyline) {
+        map.removeLayer(routePolyline);
+        routePolyline = null;
+    }
+    fuelStopMarkers.forEach(marker => map.removeLayer(marker));
+    fuelStopMarkers = [];
+    routeSummaryDiv.innerHTML = '';
+
+    const from = fromAirportInput.value.trim().toUpperCase();
+    const to = toAirportInput.value.trim().toUpperCase();
+    const range = parseFloat(aircraftRangeInput.value);
+    const groundspeed = parseFloat(groundspeedInput.value);
+    if (!from || !to || isNaN(range) || isNaN(groundspeed)) {
+        routeSummaryDiv.innerHTML = '<div class="error-message">All fields are required.</div>';
+        return;
+    }
+    try {
+        routeSummaryDiv.innerHTML = 'Planning route...';
+        const response = await fetch('/api/plan_route', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ from, to, range, groundspeed })
+        });
+        const data = await response.json();
+        if (!response.ok || data.error) {
+            routeSummaryDiv.innerHTML = `<div class="error-message">${data.error || 'Failed to plan route.'}</div>`;
+            return;
+        }
+        // Draw route polyline
+        const legs = data.legs;
+        if (!legs || legs.length === 0) {
+            routeSummaryDiv.innerHTML = '<div class="error-message">No route found.</div>';
+            return;
+        }
+        // Fetch coordinates for each airport in the route
+        const airportCoords = {};
+        const airportInfo = {};
+        for (const leg of legs) {
+            if (!airportCoords[leg.from]) {
+                const res = await fetch(`/api/airport?code=${leg.from}`);
+                const info = await res.json();
+                airportCoords[leg.from] = [info.latitude, info.longitude];
+                airportInfo[leg.from] = info;
+            }
+            if (!airportCoords[leg.to]) {
+                const res = await fetch(`/api/airport?code=${leg.to}`);
+                const info = await res.json();
+                airportCoords[leg.to] = [info.latitude, info.longitude];
+                airportInfo[leg.to] = info;
+            }
+        }
+        // Fetch weather for each waypoint
+        const weatherByCode = {};
+        for (const code of Object.keys(airportCoords)) {
+            const [lat, lon] = airportCoords[code];
+            const wres = await fetch('/api/weather', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ lat, lon, days: 1 })
+            });
+            const wdata = await wres.json();
+            weatherByCode[code] = wdata.current || {};
+        }
+        // Build polyline coordinates
+        const routeCoords = [airportCoords[legs[0].from]];
+        legs.forEach(leg => routeCoords.push(airportCoords[leg.to]));
+        routePolyline = L.polyline(routeCoords, { color: 'blue', weight: 4 }).addTo(map);
+        map.fitBounds(routePolyline.getBounds(), { padding: [50, 50] });
+        // Mark fuel stops (all intermediate airports)
+        data.fuel_stops.forEach(code => {
+            const [lat, lon] = airportCoords[code];
+            const wx = weatherByCode[code];
+            const marker = L.marker([lat, lon], { title: code, icon: L.icon({
+                iconUrl: 'https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/images/marker-icon.png',
+                iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34] })
+            }).addTo(map);
+            marker.bindPopup(`<strong>Fuel Stop</strong><br>${code}<br>${wx.temperature !== undefined ? `Temp: ${wx.temperature}&deg;C<br>Wind: ${wx.windspeed} kt` : 'Weather unavailable'}`);
+            fuelStopMarkers.push(marker);
+        });
+        // Mark start/end with weather popups
+        const endpoints = [legs[0].from, legs[legs.length-1].to];
+        endpoints.forEach(code => {
+            const [lat, lon] = airportCoords[code];
+            const wx = weatherByCode[code];
+            const marker = L.marker([lat, lon], { title: code }).addTo(map);
+            marker.bindPopup(`<strong>${code}</strong><br>${wx.temperature !== undefined ? `Temp: ${wx.temperature}&deg;C<br>Wind: ${wx.windspeed} kt` : 'Weather unavailable'}`);
+            fuelStopMarkers.push(marker);
+        });
+        // Show summary with weather for each leg
+        routeSummaryDiv.innerHTML = `<div class="route-stats">
+            <b>Route:</b> ${from} → ${to}<br>
+            <b>Total Distance:</b> ${data.total_distance_nm.toFixed(1)} nm<br>
+            <b>Estimated Time:</b> ${data.estimated_time_hr.toFixed(2)} hr<br>
+            <b>Fuel Stops:</b> ${data.fuel_stops.length > 0 ? data.fuel_stops.join(', ') : 'None'}<br>
+        </div>
+        <div class="route-legs"><b>Legs & Weather:</b><ul style='margin:0;padding-left:18px;'>
+            ${legs.map((leg, i) => {
+                const wx = weatherByCode[leg.from];
+                return `<li>${leg.from} → ${leg.to}: ${leg.distance_nm.toFixed(1)} nm, FL${Math.round(leg.cruise_altitude_ft/100)} (${leg.cruise_altitude_ft} ft), ${leg.estimated_time_hr.toFixed(2)} hr` +
+                    (wx.temperature !== undefined ? ` — <span style='color:#0077b6'>Temp: ${wx.temperature}&deg;C, Wind: ${wx.windspeed} kt</span>` : ' — Weather unavailable') +
+                    `</li>`;
+            }).join('')}
+        </ul></div>`;
+    } catch (error) {
+        routeSummaryDiv.innerHTML = `<div class=\"error-message\">${error.message}</div>`;
+    }
+});
+
 // Weather overlay layers
 let weatherLayers = {
     clouds: L.tileLayer(`https://tile.openweathermap.org/map/clouds_new/{z}/{x}/{y}.png?appid=${API_KEY}`, {

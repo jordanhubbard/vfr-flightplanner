@@ -1,5 +1,4 @@
 import pytest
-from flask import url_for
 from app import create_app
 
 @pytest.fixture
@@ -11,7 +10,7 @@ def client():
 
 def test_index_page(client):
     """Test the root UI endpoint returns 200 and contains expected content."""
-    response = client.get(url_for('main.index'))
+    response = client.get('/')
     assert response.status_code == 200
     assert b'Weather' in response.data  # Adjust string as needed for your UI
 

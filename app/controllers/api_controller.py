@@ -9,6 +9,7 @@ import xml.etree.ElementTree as ET
 from app.utils.api_helpers import check_owm_api, check_meteo_api
 from app.models.weather import get_weather_data
 from app.models.airport import get_airports, get_airport_coordinates, get_metar_data
+from app.models.flight_planner import plan_route
 
 logger = logging.getLogger(__name__)
 
@@ -153,3 +154,22 @@ def metar():
             'error': 'Server error',
             'message': str(e)
         }), 500
+
+@api_bp.route('/plan_route', methods=['POST'])
+def plan_route_api():
+    """Plan a VFR route between two airports with terrain, VFR, and fuel stops."""
+    try:
+        data = request.get_json()
+        from_code = data.get('from', '').strip().upper()
+        to_code = data.get('to', '').strip().upper()
+        aircraft_range = float(data.get('range', 400))
+        groundspeed = float(data.get('groundspeed', 120))
+        if not from_code or not to_code:
+            return jsonify({'error': 'Missing required parameters'}), 400
+        route = plan_route(from_code, to_code, aircraft_range, groundspeed)
+        if 'error' in route:
+            return jsonify(route), 400
+        return jsonify(route)
+    except Exception as e:
+        logger.error(f"Error in plan_route: {str(e)}")
+        return jsonify({'error': 'Server error', 'message': str(e)}), 500

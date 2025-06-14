@@ -1,15 +1,8 @@
 #!/bin/bash
-# Test runner script for Weather Forecasts application
+# Strictly containerized test runner for Weather Forecasts application
+set -e
 
-# Activate virtual environment if it exists
-if [ -d "venv" ]; then
-    echo "Activating virtual environment..."
-    source venv/bin/activate
-fi
+echo "Running tests in Docker container..."
+docker-compose exec web pytest tests/
 
-# Run tests with pytest
-echo "Running tests..."
-python -m pytest tests/ -v
-
-# Return to the original directory
-echo "Tests completed."
+echo "Tests completed in container."

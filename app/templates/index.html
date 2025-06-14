@@ -83,6 +83,21 @@
         </div>
 
         <div class="main-content">
+            <div id="flight-planner">
+                <h2>Flight Planner</h2>
+                <form id="flight-plan-form">
+                    <label for="from-airport">From (ICAO):</label>
+                    <input type="text" id="from-airport" maxlength="4" required placeholder="KPAO">
+                    <label for="to-airport">To (ICAO):</label>
+                    <input type="text" id="to-airport" maxlength="4" required placeholder="7S5">
+                    <label for="aircraft-range">Range (nm):</label>
+                    <input type="number" id="aircraft-range" min="50" max="1200" step="1" value="400" required>
+                    <label for="groundspeed">Groundspeed (kt):</label>
+                    <input type="number" id="groundspeed" min="50" max="300" step="1" value="120" required>
+                    <button type="submit">Plan Flight</button>
+                </form>
+                <div id="route-summary"></div>
+            </div>
             <div id="map"></div>
             <div id="weather-info">
                 <div class="weather-header">
