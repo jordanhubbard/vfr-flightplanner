@@ -1,5 +1,5 @@
 #!/bin/bash
-# Docker entrypoint script for Weather Forecasts application
+# Docker entrypoint script for Flight Planner application
 
 set -e
 
@@ -7,7 +7,7 @@ set -e
 PORT=${PORT:-8080}
 
 # Print environment information
-echo "Starting Weather Forecasts application..."
+echo "Starting Flight Planner application..."
 echo "Environment: ${FLASK_ENV:-production}"
 echo "Port: ${PORT}"
 

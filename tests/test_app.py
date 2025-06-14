@@ -17,7 +17,7 @@ def test_index_page(client):
     """Test that the index page loads."""
     response = client.get('/')
     assert response.status_code == 200
-    assert b'Weather Forecast' in response.data
+    assert b'Flight Planner' in response.data
 
 def test_api_health(client):
     """Test the API health endpoint."""

@@ -1,13 +1,13 @@
-# Contributing to Weather Forecasts
+# Contributing to Flight Planner
 
-This document provides guidelines and instructions for contributing to the Weather Forecasts application.
+This document provides guidelines and instructions for contributing to the Flight Planner application.
 
 ## Project Structure
 
 The application follows a modular structure:
 
 ```
-weather-forecasts/
+flight-planner/
 ├── app/                    # Main application package
 │   ├── __init__.py         # Application factory
 │   ├── api/                # API endpoints

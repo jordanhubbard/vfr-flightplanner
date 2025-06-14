@@ -1,6 +1,6 @@
-# Weather Forecaster
+# Flight Planner
 
-An interactive weather forecasting application that displays detailed weather information for any location worldwide. Users can click on a map to select a location or enter an airport code (ICAO/IATA) to view weather forecasts for up to 16 days.
+A comprehensive aviation flight planning application that combines advanced route planning with detailed weather information. Users can plan flights between airports, calculate fuel requirements, visualize weather along routes, and analyze conditions for VFR and IFR operations.
 
 ## Features
 

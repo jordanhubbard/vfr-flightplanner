@@ -842,12 +842,12 @@ async function fetchWeatherData(lat = null, lon = null, days = null) {
     }
 }
 
-// Display weather data in the forecast container
+// Display weather data in the weather information container
 function displayWeatherData(data) {
     const container = document.getElementById('weather-info');
     if (!container) return;
 
-    let html = '<div class="weather-header"><h2>Weather Forecast</h2></div>';
+    let html = '<div class="weather-header"><h2>Weather Information</h2></div>';
     
     if (data.current) {
         const current = data.current;

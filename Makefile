@@ -97,7 +97,7 @@ compose-logs:
 
 # Initialize the application
 init: setup airport-cache
-	@echo "Weather Forecasts application initialized"
+	@echo "Flight Planner application initialized"
 
 # Load test data (placeholder for future implementation)
 test-data: setup
@@ -113,8 +113,8 @@ deploy: test docker-build
 
 # Show help information
 help:
-	@echo "Weather Forecasts Makefile Help"
-	@echo "----------------------------"
+	@echo "Flight Planner Makefile Help"
+	@echo "-------------------------"
 	@echo "Available targets:"
 	@echo "  setup       - Set up development environment"
 	@echo "  run         - Run the application locally (PORT=xxxx make run for custom port)"
