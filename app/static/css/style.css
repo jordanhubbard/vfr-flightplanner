@@ -26,22 +26,404 @@ header h1 {
     margin-bottom: 10px;
 }
 
-.controls {
-    background: white;
+/* Weather Forecast Controls (moved to top) */
+.forecast-controls {
+    background-color: white;
     padding: 15px;
-    margin: 10px 0;
     border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    display: flex !important;
-    flex-wrap: wrap;
-    gap: 15px;
-    align-items: center;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    margin-bottom: 15px;
 }
 
-.slider-container {
+/* Compact controls layout */
+.controls-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+    margin-bottom: 15px;
+}
+
+.controls-row:last-child {
+    margin-bottom: 0;
+}
+
+/* Flight Planner Styles */
+.flight-planner-controls {
+    background-color: white;
+    padding: 15px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    margin-bottom: 15px;
+}
+
+.flight-planner-header {
+    margin-bottom: 15px;
+}
+
+.flight-planner-header h2 {
+    color: #2c3e50;
+    margin: 0;
+    font-size: 1.5rem;
+}
+
+.flight-form-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+    margin-bottom: 15px;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.form-group label {
+    font-weight: 500;
+    color: #2c3e50;
+    font-size: 0.9rem;
+}
+
+.form-group input[type="text"],
+.form-group input[type="number"] {
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+    transition: border-color 0.2s;
+}
+
+.form-group input[type="text"]:focus,
+.form-group input[type="number"]:focus {
+    outline: none;
+    border-color: #007bff;
+    box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+}
+
+.form-group input[type="text"] {
+    text-transform: uppercase;
+}
+
+.form-actions {
+    display: flex;
+    align-items: end;
+    justify-content: center;
+}
+
+.flight-options {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+    margin-bottom: 15px;
+    padding: 10px;
+    background-color: #f8f9fa;
+    border-radius: 6px;
+}
+
+.flight-options label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    color: #2c3e50;
+}
+
+.flight-options input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+}
+
+#route-summary {
+    margin-top: 15px;
+    padding: 15px;
+    background-color: #f8f9fa;
+    border-radius: 6px;
+    border-left: 4px solid #007bff;
+    display: none;
+}
+
+#route-summary.show {
+    display: block;
+}
+
+.route-stats {
+    margin-bottom: 10px;
+    font-size: 0.95rem;
+    line-height: 1.5;
+}
+
+.route-legs {
+    font-size: 0.9rem;
+}
+
+.route-legs ul {
+    margin: 5px 0 0 0;
+    padding-left: 18px;
+}
+
+.route-legs li {
+    margin-bottom: 3px;
+}
+
+#flight-legs-container {
+    margin-top: 20px;
+}
+
+#flight-legs-container h3 {
+    color: #2c3e50;
+    margin-bottom: 10px;
+    font-size: 1.2rem;
+}
+
+#flight-legs-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: white;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    border-radius: 8px;
+    overflow: hidden;
+    font-size: 13px;
+}
+
+#flight-legs-table th,
+#flight-legs-table td {
+    padding: 10px 12px;
+    text-align: left;
+    border-bottom: 1px solid #eee;
+    white-space: nowrap;
+}
+
+#flight-legs-table th {
+    background-color: #f8f9fa;
+    font-weight: 600;
+    color: #333;
+    text-transform: uppercase;
+    font-size: 0.8em;
+    letter-spacing: 0.5px;
+}
+
+#flight-legs-table tr:last-child td {
+    border-bottom: none;
+}
+
+#flight-legs-table tr:hover {
+    background-color: #f8f9fa;
+}
+
+.flight-leg {
+    transition: background-color 0.2s;
+}
+
+@media (max-width: 768px) {
+    .controls-row {
+        grid-template-columns: 1fr;
+        gap: 10px;
+    }
+    
+    .location-controls {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+    }
+    
+    .checkbox-group {
+        gap: 10px;
+    }
+    
+    .flight-form-row {
+        grid-template-columns: 1fr;
+        gap: 10px;
+    }
+    
+    .flight-options {
+        flex-direction: column;
+        gap: 10px;
+    }
+    
+    #flight-legs-table {
+        display: block;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    
+    #flight-legs-table th,
+    #flight-legs-table td {
+        min-width: 100px;
+        padding: 8px 10px;
+    }
+}
+
+.forecast-header {
+    margin-bottom: 20px;
+}
+
+.forecast-header h2 {
+    color: #2c3e50;
+    margin: 0;
+    font-size: 1.5rem;
+}
+
+.forecast-header {
+    margin-bottom: 15px;
+}
+
+/* Date Selector Styles */
+.date-selector {
+    margin-bottom: 15px;
+    padding: 12px 15px;
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    border: 1px solid #e9ecef;
+}
+
+.date-controls {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.date-display {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background-color: white;
+    padding: 6px 10px;
+    border-radius: 6px;
+    border: 1px solid #ddd;
+}
+
+.date-input {
+    border: none;
+    outline: none;
+    font-size: 16px;
+    font-weight: 500;
+    color: #2c3e50;
+    background: transparent;
+}
+
+.nav-button {
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    font-size: 18px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.nav-button:hover {
+    background-color: #0056b3;
+    transform: scale(1.05);
+}
+
+.nav-button:disabled {
+    background-color: #6c757d;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.today-btn {
+    background-color: #28a745;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 6px 12px;
+    font-size: 14px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.today-btn:hover {
+    background-color: #218838;
+}
+
+/* Weather Overlays Section */
+.weather-overlays {
+    margin-bottom: 15px;
+    padding: 12px 15px;
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    border: 1px solid #e9ecef;
+}
+
+.weather-overlays .control-group {
     display: flex;
     align-items: center;
     gap: 15px;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+}
+
+.weather-overlays .control-group:last-child {
+    margin-bottom: 0;
+}
+
+.weather-overlays .control-group label {
+    font-weight: 500;
+    color: #2c3e50;
+    white-space: nowrap;
+    min-width: fit-content;
+}
+
+.checkbox-group {
+    display: flex;
+    gap: 15px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+/* Area Forecast Section */
+.area-forecast {
+    margin-bottom: 15px;
+    padding: 12px 15px;
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    border: 1px solid #e9ecef;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.area-forecast label {
+    font-weight: 500;
+    color: #2c3e50;
+    white-space: nowrap;
+}
+
+#area-forecast-airport {
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+    text-transform: uppercase;
+    min-width: 120px;
+}
+
+.btn-primary {
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 8px 16px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background-color 0.2s;
+}
+
+.btn-primary:hover {
+    background-color: #0056b3;
 }
 
 input[type="range"] {
@@ -65,7 +447,7 @@ input[type="range"] {
 }
 
 #map {
-    height: 500px;
+    height: 600px;
     border-radius: 8px;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
     width: 100%;
@@ -90,47 +472,24 @@ input[type="range"] {
 
 .location-controls {
     display: flex;
-    flex-direction: column;
-    gap: 10px;
+    flex-direction: row;
+    gap: 15px;
     align-items: center;
+    flex-wrap: wrap;
+    justify-content: space-between;
 }
 
 .airport-search {
     display: flex;
     gap: 8px;
     align-items: center;
-    margin-top: 2px;
-}
-
-.airport-search input {
-    padding: 4px 8px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    font-size: 13px;
-    width: 120px;
-    text-transform: uppercase;
-}
-
-.airport-search button {
-    padding: 4px 12px;
-    background: #007bff;
-    color: white;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 13px;
-    white-space: nowrap;
-}
-
-.airport-search button:hover {
-    background: #0056b3;
 }
 
 #airport-code {
-    padding: 4px 8px;
+    padding: 6px 12px;
     border: 1px solid #ddd;
     border-radius: 4px;
-    font-size: 13px;
+    font-size: 14px;
     width: 120px;
     text-transform: uppercase;
 }
@@ -142,23 +501,29 @@ input[type="range"] {
 }
 
 #go-airport {
-    padding: 4px 12px;
-    background: #007bff;
+    padding: 6px 12px;
+    background-color: #007bff;
     color: white;
     border: none;
     border-radius: 4px;
     cursor: pointer;
-    font-size: 13px;
-    white-space: nowrap;
+    font-size: 14px;
+    transition: background-color 0.2s;
 }
 
 #go-airport:hover {
-    background: #0056b3;
+    background-color: #0056b3;
 }
 
 #selected-location {
     color: #666;
     font-style: italic;
+    margin: 0;
+    font-size: 0.9rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 300px;
 }
 
 #forecast-container {
@@ -305,44 +670,24 @@ input[type="range"] {
     font-size: 1rem;
 }
 
-.control-group {
-    display: flex;
-    flex-direction: column;
-    gap: 5px;
-    min-width: 150px;
-}
-
-.control-group label {
-    font-weight: 600;
-    color: #333;
-    font-size: 14px;
-    margin-bottom: 2px;
-}
-
 .checkbox-group {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    margin-top: 2px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 10px;
+    margin-bottom: 15px;
 }
 
 .checkbox-group label {
     display: flex;
     align-items: center;
-    gap: 4px;
-    font-weight: normal;
-    font-size: 13px;
-    margin-bottom: 0;
+    gap: 8px;
+    cursor: pointer;
 }
 
 .checkbox-group input[type="checkbox"] {
     width: 16px;
     height: 16px;
     cursor: pointer;
-}
-
-.checkbox-group input[type="checkbox"] {
-    margin: 0;
 }
 
 .overlay-opacity {
@@ -498,26 +843,6 @@ input[type="range"] {
     gap: 10px;
 }
 
-.nav-button {
-    background-color: #007bff;
-    color: white;
-    border: none;
-    border-radius: 4px;
-    padding: 5px 10px;
-    cursor: pointer;
-    font-size: 16px;
-    transition: background-color 0.2s;
-}
-
-.nav-button:hover {
-    background-color: #0056b3;
-}
-
-.nav-button:disabled {
-    background-color: #ccc;
-    cursor: not-allowed;
-}
-
 #overlay-date {
     font-size: 16px;
     font-weight: 500;
@@ -625,220 +950,93 @@ input[type="range"] {
     font-weight: 500;
 }
 
-/* Flight Planning Form Enhancements */
-.form-row {
-    display: flex;
-    gap: 15px;
+/* Airport Status Section */
+.airport-status {
     margin-bottom: 15px;
-    align-items: flex-end;
-}
-
-.form-group {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-}
-
-.form-group label {
-    margin-bottom: 5px;
-    font-weight: 500;
-    color: #2c3e50;
-}
-
-.form-group input {
-    padding: 8px 12px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    font-size: 14px;
-}
-
-.form-group input:focus {
-    outline: none;
-    border-color: #3498db;
-    box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
-}
-
-.checkbox-group {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-}
-
-.checkbox-group label {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 14px;
-    cursor: pointer;
-}
-
-.checkbox-group input[type="checkbox"] {
-    margin: 0;
-}
-
-/* Flight Legs Table */
-#flight-legs-container {
-    margin-top: 20px;
-    background-color: white;
-    padding: 15px;
-    border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-
-#flight-legs-table {
-    width: 100%;
-    border-collapse: collapse;
-    margin-top: 10px;
-}
-
-#flight-legs-table th,
-#flight-legs-table td {
-    padding: 10px;
-    text-align: left;
-    border-bottom: 1px solid #ddd;
-}
-
-#flight-legs-table th {
+    padding: 12px 15px;
     background-color: #f8f9fa;
-    font-weight: 600;
-    color: #2c3e50;
-}
-
-#flight-legs-table tr:hover {
-    background-color: #f8f9fa;
-}
-
-/* Fuel Stop Row Styling */
-#flight-legs-table tr.fuel-stop {
-    background-color: #fff3cd;
-    border-left: 4px solid #ffc107;
-}
-
-#flight-legs-table tr.fuel-stop:hover {
-    background-color: #ffeaa7;
-}
-
-/* Flight Leg Row Styling */
-#flight-legs-table tr.flight-leg {
-    background-color: #d1ecf1;
-    border-left: 4px solid #17a2b8;
-}
-
-#flight-legs-table tr.flight-leg:hover {
-    background-color: #bee5eb;
-}
-
-/* Responsive Design for Form */
-@media (max-width: 768px) {
-    .form-row {
-        flex-direction: column;
-        gap: 10px;
-    }
-    
-    #flight-legs-table {
-        font-size: 12px;
-    }
-    
-    #flight-legs-table th,
-    #flight-legs-table td {
-        padding: 6px;
-    }
-}
-
-/* Weather information styling */
-.weather-header {
-    background: #2c3e50;
-    color: white;
-    padding: 15px;
-    border-radius: 8px 8px 0 0;
-    margin-bottom: 0;
-}
-
-.weather-header h2 {
-    margin: 0;
-    font-size: 1.2rem;
-}
-
-.current-weather {
-    background: #f8f9fa;
-    padding: 15px;
-    border-bottom: 1px solid #dee2e6;
-}
-
-.current-weather h3 {
-    margin: 0 0 10px 0;
-    color: #2c3e50;
-    font-size: 1rem;
-}
-
-.hourly-forecast {
-    padding: 15px;
-}
-
-.hourly-forecast h3 {
-    margin: 0 0 15px 0;
-    color: #2c3e50;
-    font-size: 1rem;
-}
-
-.forecast-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-    gap: 15px;
-    max-height: 300px;
-    overflow-y: auto;
-}
-
-.forecast-item {
-    background: white;
-    border: 1px solid #dee2e6;
     border-radius: 6px;
-    padding: 10px;
-    text-align: center;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    border: 1px solid #e9ecef;
 }
 
-.forecast-time {
-    font-weight: 600;
-    color: #2c3e50;
-    margin-bottom: 5px;
-}
-
-.forecast-temp {
-    font-size: 1.1rem;
-    color: #007bff;
-    margin-bottom: 8px;
-}
-
-.forecast-wind {
+.status-item {
     display: flex;
-    justify-content: center;
     align-items: center;
-    min-height: 30px;
+    gap: 10px;
+    font-size: 14px;
 }
 
-.wind-detail {
-    align-items: center !important;
+.status-icon {
+    font-size: 16px;
+    font-weight: bold;
+    color: #28a745;
 }
 
-.wind-cell {
-    text-align: center;
-    vertical-align: middle;
+.status-icon.error {
+    color: #dc3545;
 }
 
-/* Ensure controls remain horizontal */
-@media (max-width: 768px) {
-    .controls {
-        flex-direction: column;
-        align-items: stretch;
-    }
-    
-    .control-group {
-        min-width: auto;
-    }
-    
-    .forecast-grid {
-        grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
-        gap: 10px;
-    }
+.status-text {
+    flex-grow: 1;
+    color: #2c3e50;
 }
+
+.loading-text {
+    color: #6c757d;
+    font-style: italic;
+}
+
+/* Loading Spinner */
+.loading-spinner {
+    width: 16px;
+    height: 16px;
+    border: 2px solid #e9ecef;
+    border-left: 2px solid #007bff;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Refresh Button */
+.refresh-btn {
+    background-color: transparent;
+    border: 1px solid #6c757d;
+    border-radius: 4px;
+    padding: 4px 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 14px;
+    color: #6c757d;
+}
+
+.refresh-btn:hover {
+    background-color: #f8f9fa;
+    border-color: #495057;
+    color: #495057;
+}
+
+.refresh-btn:active {
+    background-color: #e9ecef;
+}
+
+.refresh-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.refresh-icon {
+    display: inline-block;
+    transition: transform 0.3s ease;
+}
+
+.refresh-btn:hover .refresh-icon {
+    transform: rotate(180deg);
+}
+
+.refresh-btn.refreshing .refresh-icon {
+    animation: spin 1s linear infinite;
+} 

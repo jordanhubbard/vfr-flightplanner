@@ -7,10 +7,10 @@ import json
 import xml.etree.ElementTree as ET
 
 OPENAIP_API_KEY = os.getenv('OPENAIP_API_KEY')
-OPENAIP_API_URL = 'https://api.openaip.net/api/v4/airports'
+OPENAIP_API_URL = 'https://api.core.openaip.net/api/airports'
 
 HEADERS = {
-    'Authorization': f'Bearer {OPENAIP_API_KEY}',
+    'x-openaip-api-key': OPENAIP_API_KEY,
     'Accept': 'application/json'
 }
 
@@ -30,24 +30,29 @@ def get_airports(lat, lon, radius=50):
         radius_km = max(16, min(160, int(radius * 1.60934)))  # Convert miles to km, clamp to reasonable values
         logger.info(f"Starting OpenAIP airport data download for lat={lat}, lon={lon}, radius={radius}nm ({radius_km}km)")
         params = {
-            'lat': lat,
-            'lon': lon,
+            'latitude': lat,
+            'longitude': lon,
             'radius': radius_km
         }
+        
+        # Add API key as query parameter as fallback
+        if OPENAIP_API_KEY:
+            params['apiKey'] = OPENAIP_API_KEY
+            
         response = requests.get(OPENAIP_API_URL, headers=HEADERS, params=params, timeout=10)
         response.raise_for_status()
         data = response.json()
         airports = []
-        # OpenAIP v4 returns airports in 'data' key, not 'items'
-        for airport in data.get('data', []):
+        # OpenAIP API returns airports in 'items' key
+        for airport in data.get('items', []):
             airport_data = {
-                'icao': airport.get('icao'),
-                'iata': airport.get('iata'),
+                'icao': airport.get('icaoCode') or airport.get('icao'),
+                'iata': airport.get('iataCode') or airport.get('iata'),
                 'name': airport.get('name'),
                 'city': airport.get('city'),
-                'country': airport.get('country'),
-                'latitude': airport.get('lat'),
-                'longitude': airport.get('lon'),
+                'country': airport.get('country', {}).get('name') if isinstance(airport.get('country'), dict) else airport.get('country'),
+                'latitude': airport.get('geometry', {}).get('coordinates', [None, None])[1] if airport.get('geometry') else airport.get('lat'),
+                'longitude': airport.get('geometry', {}).get('coordinates', [None, None])[0] if airport.get('geometry') else airport.get('lon'),
                 'elevation': airport.get('elevation'),
                 'type': airport.get('type'),
                 'distance': airport.get('distance', None),

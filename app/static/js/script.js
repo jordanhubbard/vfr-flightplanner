@@ -519,10 +519,15 @@ flightPlanForm.addEventListener('submit', async function(e) {
         const weatherByCode = {};
         for (const code of Object.keys(airportCoords)) {
             const [lat, lon] = airportCoords[code];
-            const wres = await fetch('/api/weather', {
+            const wres = await fetch('/get_weather', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ lat, lon, days: 1 })
+                body: JSON.stringify({ 
+                    lat, 
+                    lon, 
+                    forecast_date: new Date().toISOString().split('T')[0],
+                    overlays: []
+                })
             });
             const wdata = await wres.json();
             weatherByCode[code] = wdata.current || {};
@@ -824,56 +829,7 @@ function getWindDisplayWithBarb(windSpeed, windDirection, altitude = null) {
     return container;
 }
 
-// Add area forecast functionality
-document.getElementById('area-forecast-btn').addEventListener('click', async function() {
-    const airportCode = document.getElementById('area-forecast-airport').value.trim().toUpperCase();
-    if (!airportCode) {
-        alert('Please enter an airport code');
-        return;
-    }
-    
-    try {
-        // Get airport coordinates
-        const airportResponse = await fetch(`/api/airport?code=${airportCode}`);
-        const airportData = await airportResponse.json();
-        
-        if (!airportResponse.ok) {
-            alert(`Airport ${airportCode} not found`);
-            return;
-        }
-        
-        // Center map on airport and show 50nm radius
-        const lat = airportData.latitude;
-        const lon = airportData.longitude;
-        map.setView([lat, lon], 9);
-        
-        // Add a circle to show 50nm radius
-        if (window.areaForecastCircle) {
-            map.removeLayer(window.areaForecastCircle);
-        }
-        
-        // Convert 50nm to meters (1 nautical mile = 1852 meters)
-        const radiusMeters = 50 * 1852;
-        window.areaForecastCircle = L.circle([lat, lon], {
-            radius: radiusMeters,
-            color: '#ff7800',
-            weight: 2,
-            fillColor: '#ff7800',
-            fillOpacity: 0.1
-        }).addTo(map);
-        
-        // Set the position for weather data fetching
-        lastKnownPosition = { lat: lat, lng: lon };
-        
-        // Fetch weather data for the area
-        await fetchWeatherData(lat, lon);
-        updateSelectedLocation(lat, lon);
-        
-    } catch (error) {
-        console.error('Error fetching area forecast:', error);
-        alert('Error fetching area forecast');
-    }
-});
+
 
 // Weather overlay layers
 let weatherLayers = {
@@ -1277,17 +1233,7 @@ function displayWeatherData(data) {
     }
 }
 
-// Function to format ceiling for forecast table
-function formatCeiling(cloudCover, cloudBase) {
-    if (cloudBase && cloudBase > 0) {
-        return `${Math.round(cloudBase)} ft`;
-    } else if (cloudCover < 30) {  // Show CLR when cloud cover is low
-        return 'CLR';
-    } else if (cloudCover >= 30 && !cloudBase) {  // Show OVC when cloudy but no base data
-        return 'OVC';
-    }
-    return 'Unknown';
-} 
+ 
 
 // Function to update selected location display
 function updateSelectedLocation(lat, lon) {

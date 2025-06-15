@@ -2,20 +2,14 @@ import os
 import requests
 import json
 import time
-
-OPENAIP_API_KEY = os.getenv('OPENAIP_API_KEY')
-import os
-import requests
-import json
-import time
 import logging
 
 OPENAIP_API_KEY = os.getenv('OPENAIP_API_KEY')
-OPENAIP_API_URL = 'https://api.openaip.net/api/v4/airports'
+OPENAIP_API_URL = 'https://api.core.openaip.net/api/airports'
 CACHE_FILE = os.path.join(os.path.dirname(__file__), '../app/models/airports_cache.json')
 
 HEADERS = {
-    'Authorization': f'Bearer {OPENAIP_API_KEY}',
+    'x-openaip-api-key': OPENAIP_API_KEY,
     'Accept': 'application/json'
 }
 
@@ -29,12 +23,17 @@ def download_all_airports():
     page = 1
     while True:
         params = {'page': page, 'limit': PAGE_SIZE}
+        
+        # Add API key as query parameter as fallback
+        if OPENAIP_API_KEY:
+            params['apiKey'] = OPENAIP_API_KEY
+            
         logger.info(f"Requesting airports page {page}...")
         try:
             resp = requests.get(OPENAIP_API_URL, headers=HEADERS, params=params, timeout=30)
             resp.raise_for_status()
             data = resp.json()
-            items = data.get('data', [])
+            items = data.get('items', [])
             logger.info(f"Received {len(items)} airports on page {page}.")
             if not items:
                 break
