@@ -190,40 +190,64 @@ def get_weather():
         # Extract parameters from request
         lat = data.get('lat')
         lon = data.get('lon')
-        days = data.get('days', 7)  # Default to 7 days if not specified
+        forecast_date = data.get('forecast_date')  # Get the selected forecast date
         overlays = data.get('overlays', [])  # Get active overlays
         
         # Log request parameters
-        app.logger.info(f'Weather request for coordinates: {lat}, {lon} with {days} days forecast')
+        app.logger.info(f'Weather request for coordinates: {lat}, {lon} for date: {forecast_date}')
         
         if not all(isinstance(x, (int, float)) for x in [lat, lon]):
             return jsonify({
                 'error': 'Invalid coordinates',
                 'details': 'Latitude and longitude must be numbers'
             }), 400
-            
-        # Use the current system date
+        
+        # Parse the forecast date if provided, otherwise use today
         today = datetime.now().date()
-        app.logger.info(f'Using current date: {today}')
+        if forecast_date:
+            try:
+                requested_date = datetime.strptime(forecast_date, '%Y-%m-%d').date()
+            except ValueError:
+                return jsonify({
+                    'error': 'Invalid date format',
+                    'details': 'Date must be in YYYY-MM-DD format'
+                }), 400
+        else:
+            requested_date = today
+            
+        app.logger.info(f'Using forecast date: {requested_date}')
         
         max_forecast_days = 16  # Open-Meteo API limitation
         
-        # Always use today as the start date
-        requested_date = today
+        # Calculate days from today to requested date
+        days_from_today = (requested_date - today).days
         
-        # Adjust days if it would exceed the maximum forecast period
-        if days > max_forecast_days:
-            days = max_forecast_days
-            app.logger.info(f'Adjusted forecast period to {days} days to stay within API limits')
+        # Validate date range
+        if days_from_today < 0:
+            return jsonify({
+                'error': 'Invalid date',
+                'details': 'Cannot request weather data for past dates'
+            }), 400
+            
+        if days_from_today >= max_forecast_days:
+            return jsonify({
+                'error': 'Date too far in future',
+                'details': f'Weather data is only available for {max_forecast_days} days from today'
+            }), 400
         
-        end_date = requested_date + timedelta(days=days-1)
+        # Always request full forecast period to get the requested date
+        forecast_days = max(days_from_today + 1, 7)  # Get at least 7 days or enough to include requested date
+        if forecast_days > max_forecast_days:
+            forecast_days = max_forecast_days
+            
+        end_date = requested_date
             
         # Construct the API URL with parameters
         params = {
             'latitude': lat,
             'longitude': lon,
             'timezone': 'auto',
-            'forecast_days': days,
+            'forecast_days': forecast_days,
             'hourly': [
                 'temperature_2m',
                 'windspeed_10m',
@@ -984,6 +1008,101 @@ def get_airport_coordinates():
         app.logger.error(f'Unexpected error: {str(e)}')
         return jsonify({
             'error': 'Internal server error',
+            'details': str(e)
+        }), 500
+
+@app.route('/api/airport-cache-status')
+def airport_cache_status():
+    """Check the status of airport cache files"""
+    try:
+        cache_file = '/app/app/models/airports_cache.json'
+        csv_file = '/app/xctry-planner/backend/airports.csv'
+        
+        # Check if files exist and get their info
+        openaip_exists = os.path.exists(cache_file)
+        csv_exists = os.path.exists(csv_file)
+        
+        status = {
+            'openaip_cache': {
+                'exists': openaip_exists,
+                'size': os.path.getsize(cache_file) if openaip_exists else 0,
+                'modified': datetime.fromtimestamp(os.path.getmtime(cache_file)).isoformat() if openaip_exists else None,
+                'airport_count': 0
+            },
+            'ourairports_csv': {
+                'exists': csv_exists,
+                'size': os.path.getsize(csv_file) if csv_exists else 0,
+                'modified': datetime.fromtimestamp(os.path.getmtime(csv_file)).isoformat() if csv_exists else None
+            },
+            'overall_status': 'ready' if (openaip_exists and csv_exists) else 'missing'
+        }
+        
+        # Count airports in cache if file exists
+        if openaip_exists:
+            try:
+                import json
+                with open(cache_file, 'r') as f:
+                    airport_data = json.load(f)
+                    status['openaip_cache']['airport_count'] = len(airport_data) if isinstance(airport_data, list) else 0
+            except Exception as e:
+                app.logger.error(f"Error reading airport cache: {e}")
+                
+        return jsonify(status)
+        
+    except Exception as e:
+        app.logger.error(f"Error checking airport cache status: {e}")
+        return jsonify({
+            'error': 'Failed to check airport cache status',
+            'details': str(e)
+        }), 500
+
+@app.route('/api/refresh-airport-cache', methods=['POST'])
+def refresh_airport_cache():
+    """Manually trigger airport cache refresh"""
+    try:
+        import subprocess
+        import threading
+        
+        def run_refresh():
+            """Run airport cache refresh in background"""
+            try:
+                # Run the airport cache update scripts
+                app.logger.info("Starting manual airport cache refresh...")
+                
+                # Update OpenAIP cache
+                result1 = subprocess.run(['python3', '/app/scripts/update_airport_cache.py'], 
+                                       capture_output=True, text=True, timeout=120)
+                app.logger.info(f"OpenAIP update result: {result1.returncode}, stdout: {result1.stdout}, stderr: {result1.stderr}")
+                
+                # Fetch OurAirports CSV
+                result2 = subprocess.run(['python3', '/app/scripts/fetch_ourairports_csv.py'], 
+                                       capture_output=True, text=True, timeout=60)
+                app.logger.info(f"OurAirports fetch result: {result2.returncode}, stdout: {result2.stdout}, stderr: {result2.stderr}")
+                
+                # Merge datasets
+                result3 = subprocess.run(['python3', '/app/scripts/merge_airport_datasets.py'], 
+                                       capture_output=True, text=True, timeout=60)
+                app.logger.info(f"Merge datasets result: {result3.returncode}, stdout: {result3.stdout}, stderr: {result3.stderr}")
+                
+                app.logger.info("Airport cache refresh completed")
+                
+            except Exception as e:
+                app.logger.error(f"Error during airport cache refresh: {e}")
+        
+        # Start refresh in background thread
+        refresh_thread = threading.Thread(target=run_refresh)
+        refresh_thread.daemon = True
+        refresh_thread.start()
+        
+        return jsonify({
+            'status': 'started',
+            'message': 'Airport cache refresh started in background'
+        })
+        
+    except Exception as e:
+        app.logger.error(f"Error starting airport cache refresh: {e}")
+        return jsonify({
+            'error': 'Failed to start airport cache refresh',
             'details': str(e)
         }), 500
 

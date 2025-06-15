@@ -96,12 +96,255 @@ setInterval(updateApiStatus, 30000);
 let currentMarker = null;
 let lastKnownPosition = null;
 let airportMarkers = [];  // Array to store airport markers
-const daysSlider = document.getElementById('forecast-days');
-const daysValue = document.getElementById('days-value');
+let currentForecastDate = new Date(); // Track the current forecast date
 const opacitySlider = document.getElementById('overlay-opacity');
 const maxForecastDays = 16;  // Open-Meteo API limitation
 const airportCodeInput = document.getElementById('airport-code');
 const goAirportButton = document.getElementById('go-airport');
+
+// Date navigation elements
+const forecastDateInput = document.getElementById('forecast-date');
+const prevDateButton = document.getElementById('prev-date');
+const nextDateButton = document.getElementById('next-date');
+const todayButton = document.getElementById('today-button');
+
+// Initialize date picker with today's date
+function initializeDatePicker() {
+    const today = new Date();
+    currentForecastDate = new Date(today);
+    updateDateDisplay();
+    updateNavigationButtons();
+}
+
+// Update the date input display
+function updateDateDisplay() {
+    const dateString = currentForecastDate.toISOString().split('T')[0];
+    forecastDateInput.value = dateString;
+}
+
+// Update navigation button states
+function updateNavigationButtons() {
+    const today = new Date();
+    const maxDate = new Date(today);
+    maxDate.setDate(today.getDate() + maxForecastDays);
+    
+    // Disable previous button if we're at today
+    prevDateButton.disabled = currentForecastDate.toDateString() === today.toDateString();
+    
+    // Disable next button if we're at max forecast date
+    nextDateButton.disabled = currentForecastDate >= maxDate;
+    
+    // Update today button visibility
+    todayButton.style.display = currentForecastDate.toDateString() === today.toDateString() ? 'none' : 'inline-block';
+}
+
+// Handle date changes
+function handleDateChange(newDate) {
+    currentForecastDate = new Date(newDate);
+    updateDateDisplay();
+    updateNavigationButtons();
+    
+    // Refresh weather data if we have a location
+    if (lastKnownPosition) {
+        fetchWeatherData();
+    }
+}
+
+// Event listeners for date navigation
+prevDateButton.addEventListener('click', () => {
+    const newDate = new Date(currentForecastDate);
+    newDate.setDate(newDate.getDate() - 1);
+    handleDateChange(newDate);
+});
+
+nextDateButton.addEventListener('click', () => {
+    const newDate = new Date(currentForecastDate);
+    newDate.setDate(newDate.getDate() + 1);
+    handleDateChange(newDate);
+});
+
+todayButton.addEventListener('click', () => {
+    handleDateChange(new Date());
+});
+
+forecastDateInput.addEventListener('change', (e) => {
+    const selectedDate = new Date(e.target.value);
+    handleDateChange(selectedDate);
+});
+
+// Initialize date picker
+initializeDatePicker();
+
+// Airport status elements
+const airportStatusElements = {
+    loading: document.getElementById('airport-loading'),
+    ready: document.getElementById('airport-ready'),
+    error: document.getElementById('airport-error'),
+    count: document.getElementById('airport-count'),
+    refreshBtn: document.getElementById('refresh-airports'),
+    refreshErrorBtn: document.getElementById('refresh-airports-error')
+};
+
+// Airport status management
+let airportStatusCheckInterval = null;
+let isRefreshing = false;
+
+// Initialize airport status checking
+function initializeAirportStatus() {
+    checkAirportStatus();
+    
+    // Check status every 30 seconds
+    airportStatusCheckInterval = setInterval(checkAirportStatus, 30000);
+    
+    // Add event listeners for refresh buttons
+    airportStatusElements.refreshBtn.addEventListener('click', refreshAirportData);
+    airportStatusElements.refreshErrorBtn.addEventListener('click', refreshAirportData);
+}
+
+// Check airport cache status
+async function checkAirportStatus() {
+    try {
+        const response = await fetch('/api/airport-cache-status');
+        const status = await response.json();
+        
+        updateAirportStatusUI(status);
+        
+    } catch (error) {
+        console.error('Error checking airport status:', error);
+        showAirportError();
+    }
+}
+
+// Update airport status UI based on backend response
+function updateAirportStatusUI(status) {
+    // Hide all status elements first
+    hideAllAirportStatus();
+    
+    if (status.overall_status === 'ready') {
+        // Show ready status
+        airportStatusElements.ready.style.display = 'flex';
+        airportStatusElements.count.textContent = status.openaip_cache.airport_count || 0;
+    } else if (status.overall_status === 'missing') {
+        // Show loading or error based on whether we're currently refreshing
+        if (isRefreshing) {
+            showAirportLoading();
+        } else {
+            showAirportError();
+        }
+    }
+}
+
+// Show loading state
+function showAirportLoading() {
+    hideAllAirportStatus();
+    airportStatusElements.loading.style.display = 'flex';
+}
+
+// Show error state
+function showAirportError() {
+    hideAllAirportStatus();
+    airportStatusElements.error.style.display = 'flex';
+}
+
+// Hide all airport status elements
+function hideAllAirportStatus() {
+    airportStatusElements.loading.style.display = 'none';
+    airportStatusElements.ready.style.display = 'none';
+    airportStatusElements.error.style.display = 'none';
+}
+
+// Refresh airport data
+async function refreshAirportData() {
+    if (isRefreshing) return; // Prevent multiple simultaneous refreshes
+    
+    isRefreshing = true;
+    showAirportLoading();
+    
+    // Add refreshing class to buttons
+    airportStatusElements.refreshBtn.classList.add('refreshing');
+    airportStatusElements.refreshErrorBtn.classList.add('refreshing');
+    airportStatusElements.refreshBtn.disabled = true;
+    airportStatusElements.refreshErrorBtn.disabled = true;
+    
+    try {
+        const response = await fetch('/api/refresh-airport-cache', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        if (response.ok) {
+            console.log('Airport cache refresh started');
+            
+            // Poll for completion (check every 5 seconds for up to 2 minutes)
+            let attempts = 0;
+            const maxAttempts = 24; // 2 minutes / 5 seconds
+            
+            const pollCompletion = async () => {
+                attempts++;
+                
+                try {
+                    const statusResponse = await fetch('/api/airport-cache-status');
+                    const status = await statusResponse.json();
+                    
+                    if (status.overall_status === 'ready') {
+                        // Success!
+                        updateAirportStatusUI(status);
+                        isRefreshing = false;
+                        enableRefreshButtons();
+                        console.log('Airport cache refresh completed successfully');
+                        return;
+                    }
+                    
+                    if (attempts < maxAttempts) {
+                        // Continue polling
+                        setTimeout(pollCompletion, 5000);
+                    } else {
+                        // Timeout - show error
+                        console.warn('Airport cache refresh timed out');
+                        showAirportError();
+                        isRefreshing = false;
+                        enableRefreshButtons();
+                    }
+                    
+                } catch (error) {
+                    console.error('Error polling airport status:', error);
+                    if (attempts < maxAttempts) {
+                        setTimeout(pollCompletion, 5000);
+                    } else {
+                        showAirportError();
+                        isRefreshing = false;
+                        enableRefreshButtons();
+                    }
+                }
+            };
+            
+            // Start polling after a short delay
+            setTimeout(pollCompletion, 5000);
+            
+        } else {
+            throw new Error('Failed to start airport cache refresh');
+        }
+        
+    } catch (error) {
+        console.error('Error refreshing airport data:', error);
+        showAirportError();
+        isRefreshing = false;
+        enableRefreshButtons();
+    }
+}
+
+// Enable refresh buttons and remove refreshing state
+function enableRefreshButtons() {
+    airportStatusElements.refreshBtn.classList.remove('refreshing');
+    airportStatusElements.refreshErrorBtn.classList.remove('refreshing');
+    airportStatusElements.refreshBtn.disabled = false;
+    airportStatusElements.refreshErrorBtn.disabled = false;
+}
+
+// Initialize airport status checking
+initializeAirportStatus();
 
 // Weather overlay layers
 let weatherLayers = {
@@ -156,15 +399,6 @@ function getWeatherDescription(code) {
     return weatherCodes[code] || 'Unknown';
 }
 
-// Update days value display and refresh data
-daysSlider.addEventListener('input', function() {
-    const days = parseInt(this.value);
-    daysValue.textContent = days;
-    
-    // Fetch weather data
-    fetchWeatherData();
-});
-
 // Handle map clicks
 map.on('click', (e) => {
     lastKnownPosition = e.latlng;
@@ -198,19 +432,9 @@ function getFlightCategoryColor(category) {
         case 'VFR': return '#00ff00';  // Green
         case 'MVFR': return '#0000ff'; // Blue
         case 'IFR': return '#ff0000';  // Red
-        case 'LIFR': return '#ff00ff'; // Magenta
-        default: return '#808080';     // Grey
+        case 'LIFR': return '#800080'; // Purple
+        default: return '#808080';     // Gray for unknown
     }
-}
-
-// Function to create a dot icon
-function createDotIcon(color) {
-    return L.divIcon({
-        className: 'airport-dot',
-        html: `<div style="background-color: ${color}; width: 12px; height: 12px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 4px rgba(0,0,0,0.5);"></div>`,
-        iconSize: [12, 12],
-        iconAnchor: [6, 6]
-    });
 }
 
 function formatCeiling(ceiling_ft, ceiling_layer) {
@@ -319,7 +543,22 @@ Object.entries(overlayCheckboxes).forEach(([type, checkbox]) => {
     checkbox.addEventListener('change', (e) => {
         if (type === 'airports') {
             if (e.target.checked && lastKnownPosition) {
-                fetchAirports(lastKnownPosition.lat, lastKnownPosition.lng);
+                // Check if airport data is available before fetching
+                checkAirportStatus().then(() => {
+                    fetch('/api/airport-cache-status')
+                        .then(response => response.json())
+                        .then(status => {
+                            if (status.overall_status === 'ready') {
+                                fetchAirports(lastKnownPosition.lat, lastKnownPosition.lng);
+                            } else {
+                                console.warn('Airport data not ready, cannot show airports overlay');
+                                // Optionally show a message to the user
+                            }
+                        })
+                        .catch(error => {
+                            console.error('Error checking airport status:', error);
+                        });
+                });
             } else {
                 airportMarkers.forEach(marker => map.removeLayer(marker));
             }
@@ -357,8 +596,6 @@ async function fetchWeatherData() {
     }
     
     try {
-        const days = parseInt(daysSlider.value);
-        
         const response = await fetch('/get_weather', {
             method: 'POST',
             headers: {
@@ -367,7 +604,7 @@ async function fetchWeatherData() {
             body: JSON.stringify({
                 lat: lastKnownPosition.lat,
                 lon: lastKnownPosition.lng,
-                days: Math.min(days, maxForecastDays),  // Ensure we don't exceed the API limit
+                forecast_date: currentForecastDate.toISOString().split('T')[0],  // Send date in YYYY-MM-DD format
                 overlays: Object.entries(overlayCheckboxes)
                     .filter(([_, checkbox]) => checkbox.checked)
                     .map(([type]) => type)
@@ -512,7 +749,7 @@ async function handleAirportSearch() {
         container.innerHTML = `<div class="error-message">Invalid airport code format. Please enter a 3 or 4 character code (e.g., SFO or KSFO).</div>`;
         return;
     }
-
+    
     try {
         const response = await fetch('/get_airport_coordinates', {
             method: 'POST',
@@ -523,12 +760,12 @@ async function handleAirportSearch() {
                 airport_code: airportCode
             })
         });
-
+        
         if (!response.ok) {
             const errorData = await response.json();
             throw new Error(errorData.details || errorData.error || `Airport "${airportCode}" not found. Please check the code and try again.`);
         }
-
+        
         const data = await response.json();
         
         // Update map view and marker
@@ -540,14 +777,14 @@ async function handleAirportSearch() {
         } else {
             currentMarker = L.marker(lastKnownPosition).addTo(map);
         }
-
+        
         // Update location text
         const locationText = document.getElementById('selected-location');
         locationText.textContent = `${airportCode}: ${data.lat.toFixed(4)}°N, ${data.lon.toFixed(4)}°W`;
-
+        
         // Fetch weather data
         fetchWeatherData();
-
+        
         // Clear the input
         airportCodeInput.value = '';
 
@@ -565,6 +802,78 @@ async function handleAirportSearch() {
     }
 }
 
+// Add event listener for area forecast
+const areaForecastButton = document.getElementById('get-area-forecast');
+const areaForecastInput = document.getElementById('area-forecast-airport');
+
+areaForecastButton.addEventListener('click', handleAreaForecast);
+areaForecastInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+        handleAreaForecast();
+    }
+});
+
+async function handleAreaForecast() {
+    const airportCode = areaForecastInput.value.trim().toUpperCase();
+    
+    if (!airportCode) {
+        alert('Please enter an airport code');
+        return;
+    }
+    
+    if (airportCode.length !== 4) {
+        alert('Airport code must be 4 characters');
+        return;
+    }
+    
+    try {
+        // First get the airport coordinates
+        const coordResponse = await fetch('/get_airport_coordinates', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                icao_code: airportCode
+            })
+        });
+        
+        if (!coordResponse.ok) {
+            throw new Error('Airport not found');
+        }
+        
+        const coordData = await coordResponse.json();
+        const { lat, lon } = coordData;
+        
+        // Center map on airport and set location
+        map.setView([lat, lon], 10);
+        lastKnownPosition = { lat, lng: lon };
+        
+        // Update or create marker
+        if (currentMarker) {
+            currentMarker.setLatLng(lastKnownPosition);
+        } else {
+            currentMarker = L.marker(lastKnownPosition).addTo(map);
+        }
+        
+        // Update location text
+        const locationText = document.getElementById('selected-location');
+        locationText.textContent = `Area Forecast for ${airportCode}: ${lat.toFixed(4)}°N, ${lon.toFixed(4)}°W`;
+        
+        // Fetch weather data for the area
+        fetchWeatherData();
+        
+        // Fetch airports in the area if overlay is enabled
+        if (overlayCheckboxes.airports.checked) {
+            fetchAirports(lat, lon);
+        }
+        
+    } catch (error) {
+        console.error('Error getting area forecast:', error);
+        alert('Error getting area forecast: ' + error.message);
+    }
+}
+
 // Function to format ceiling for forecast table
 function formatCeiling(cloudCover, cloudBase) {
     if (cloudBase && cloudBase > 0) {
@@ -575,4 +884,11 @@ function formatCeiling(cloudCover, cloudBase) {
         return 'OVC';
     }
     return 'Unknown';
-} 
+}
+
+// Cleanup function for page unload
+window.addEventListener('beforeunload', () => {
+    if (airportStatusCheckInterval) {
+        clearInterval(airportStatusCheckInterval);
+    }
+}); 

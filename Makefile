@@ -1,55 +1,72 @@
-.PHONY: setup run clean test docker-build docker-run docker-stop init test-data lint lint-fix deploy logs
+.PHONY: run dev stop clean restart test docker-build docker-run init test-data lint lint-fix deploy logs help bake compose-up compose-down compose-logs airport-cache test-cov docker-logs deep-clean status check-service
 
 # Default port for Flask app
 PORT ?= 8080
 
-# Clean up project files
-clean: docker-stop
-	@find . -type d -name "__pycache__" -exec rm -r {} +
-	@find . -type f -name "*.pyc" -delete
-	@find . -type f -name "*.pyo" -delete
-	@find . -type f -name "*.pyd" -delete
-	@find . -type f -name ".coverage" -delete
-	@rm -f logs/*
-	@rm -rf .pytest_cache
-	# Remove all stale docker images for this application
-	-docker images --format '{{.Repository}}:{{.Tag}} {{.ID}}' | awk '/^weather-forecasts:/ {print $$2}' | xargs -r docker rmi
+# Run the application in FOREGROUND for development
+dev:
+	docker-compose up --build
+	@echo "Development mode stopped"
+
+# Run the application in BACKGROUND for deployment
+run:
+	docker-compose up --build -d
+	@echo "Application started in background. Access it at http://localhost:$(PORT)"
+	@echo "Use 'make stop' to stop or 'make logs' to view logs"
+
+# Stop the running containers
+stop:
+	docker-compose down
+	@echo "Application stopped"
+
+# Delete containers and clean up resources
+clean:
+	docker-compose down -v --remove-orphans --rmi local 2>/dev/null || true
+	docker stop weather-forecasts-container 2>/dev/null || true
+	docker rm weather-forecasts-container 2>/dev/null || true
+	@find . -type d -name "__pycache__" -exec rm -r {} + 2>/dev/null || true
+	@find . -type f -name "*.pyc" -delete 2>/dev/null || true
+	@find . -type f -name "*.pyo" -delete 2>/dev/null || true
+	@find . -type f -name "*.pyd" -delete 2>/dev/null || true
+	@find . -type f -name ".coverage" -delete 2>/dev/null || true
+	@mkdir -p logs && rm -f logs/* 2>/dev/null || true
+	@rm -rf .pytest_cache 2>/dev/null || true
+	# Remove application-specific docker images
+	-docker images --format '{{.Repository}}:{{.Tag}} {{.ID}}' | awk '/^weather-forecasts/ {print $$2}' | xargs -r docker rmi 2>/dev/null || true
+	@echo "Containers deleted and resources cleaned"
+
+# Restart application in development mode (foreground)
+restart: stop dev
+
+# Deep clean - remove everything including Docker system resources
+deep-clean: clean
+	docker system prune -f --volumes 2>/dev/null || true
+	docker builder prune -f 2>/dev/null || true
+	@echo "Deep clean completed"
 
 # Update airport cache using Python script (run inside container)
 airport-cache:
 	docker-compose run --rm web python scripts/update_airport_cache.py
 
-# Run the application via Docker Compose
-run:
-	docker-compose up --build -d
-	@echo "Application started in Docker. Access it at http://localhost:$(PORT)"
-
-# Development: build and run container interactively with source mounted
-# Usage: make dev
-# This will start the container with a shell for debugging/development
-# You can override the shell with SHELL=/bin/bash make dev
-
-dev:
-	docker-compose run --rm --service-ports web /bin/bash
+# Check if web service is running
+check-service:
+	@docker-compose ps web | grep -q "Up" || { echo "Error: Container not running. Start with 'make run' or 'make dev' first"; exit 1; }
 
 # Run tests inside Docker container
-test:
+test: check-service
 	docker-compose exec web pytest tests/
 
 # Run tests with coverage inside Docker container
-test-cov:
+test-cov: check-service
 	docker-compose exec web pytest --cov=app tests/
 
-# Lint code
-lint: setup
-	. venv/bin/activate && \
-	flake8 app/ tests/
+# Lint code inside Docker container
+lint:
+	docker-compose run --rm web flake8 app/ tests/
 
-# Auto-fix lint issues where possible
-lint-fix: setup
-	. venv/bin/activate && \
-	autopep8 --in-place --recursive app/ tests/
-
+# Auto-fix lint issues where possible inside Docker container
+lint-fix:
+	docker-compose run --rm web autopep8 --in-place --recursive app/ tests/
 
 # Docker commands
 docker-build:
@@ -59,34 +76,28 @@ docker-build:
 bake:
 	docker buildx bake --file docker-bake.hcl
 
+# Run single Docker container (alternative to docker-compose)
 docker-run: docker-build
 	docker stop weather-forecasts-container 2>/dev/null || true
 	docker rm weather-forecasts-container 2>/dev/null || true
-	docker run -p 5060:5060 \
+	docker run -p $(PORT):$(PORT) \
 		--env-file .env \
 		--name weather-forecasts-container \
 		-d weather-forecasts
-	@echo "Container started. Access the application at http://localhost:8080"
-
-docker-stop:
-	docker compose down -v --rmi all --remove-orphans || true
-
-# Restart all services (full container restart)
-restart:
-	docker-compose down
-	docker-compose up -d
+	@echo "Container started. Access the application at http://localhost:$(PORT)"
 
 # Show container logs in real time
 logs:
 	docker-compose logs -f web
 
+# Show single container logs
 docker-logs:
 	docker logs -f weather-forecasts-container
 
-# Docker Compose commands
+# Docker Compose commands (legacy - use main commands instead)
 compose-up:
-	docker-compose up -d
-	@echo "Docker Compose services started. Access the application at http://localhost:8080"
+	docker-compose up --build -d
+	@echo "Docker Compose services started. Access the application at http://localhost:$(PORT)"
 
 compose-down:
 	docker-compose down
@@ -96,45 +107,75 @@ compose-logs:
 	docker-compose logs -f
 
 # Initialize the application
-init: setup airport-cache
-	@echo "Flight Planner application initialized"
+init: airport-cache
+	@echo "Weather Forecasts application initialized"
 
-# Load test data (placeholder for future implementation)
-test-data: setup
+# Load test data (runs inside container)
+test-data:
 	@echo "Loading test data..."
-	. venv/bin/activate && \
-	PYTHONPATH=. \
-	python -c "print('Test data loaded successfully')"
+	docker-compose run --rm web python -c "print('Test data loaded successfully')"
 
 # Deploy application
 deploy: test docker-build
 	@echo "Deploying application..."
 	@echo "Deployment completed successfully"
 
+# Show application status
+status:
+	@echo "=== Docker Compose Services ==="
+	docker-compose ps
+	@echo ""
+	@echo "=== Single Container Status ==="
+	docker ps --filter name=weather-forecasts-container --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}" 2>/dev/null || echo "No single container running"
+
 # Show help information
 help:
-	@echo "Flight Planner Makefile Help"
-	@echo "-------------------------"
-	@echo "Available targets:"
-	@echo "  setup       - Set up development environment"
-	@echo "  run         - Run the application locally (PORT=xxxx make run for custom port)"
-	@echo "  test        - Run tests"
+	@echo "Weather Forecasts Makefile Help"
+	@echo "==============================="
+	@echo ""
+	@echo "Main Development Commands:"
+	@echo "  dev         - Run application in FOREGROUND (development mode)"
+	@echo "  run         - Run application in BACKGROUND (deployment mode)"
+	@echo "  stop        - Stop running containers"
+	@echo "  restart     - Stop and restart in development mode"
+	@echo "  status      - Show application status"
+	@echo "  logs        - Show container logs in real-time"
+	@echo ""
+	@echo "Testing & Quality:"
+	@echo "  test        - Run tests in container"
 	@echo "  test-cov    - Run tests with coverage report"
-	@echo "  clean       - Clean temporary files"
-	@echo "  deep-clean  - Clean everything including virtual environment"
-	@echo "  lint        - Check code style"
+	@echo "  lint        - Check code style in container"
 	@echo "  lint-fix    - Fix code style issues automatically"
+	@echo ""
+	@echo "Cleanup:"
+	@echo "  clean       - Delete containers and clean resources"
+	@echo "  deep-clean  - Clean everything including Docker system resources"
+	@echo ""
+	@echo "Docker Operations:"
 	@echo "  docker-build - Build Docker image"
-	@echo "  docker-run  - Run application in Docker container"
-	@echo "  docker-stop - Stop Docker container"
-	@echo "  docker-logs - Show Docker container logs"
-	@echo "  compose-up  - Start application with Docker Compose"
-	@echo "  compose-down - Stop Docker Compose services"
-	@echo "  compose-logs - Show Docker Compose logs"
+	@echo "  docker-run  - Run single Docker container"
+	@echo "  bake        - Multi-platform build with buildx"
+	@echo ""
+	@echo "Setup & Maintenance:"
 	@echo "  init        - Initialize the application"
+	@echo "  airport-cache - Update airport cache data"
 	@echo "  test-data   - Load test data"
 	@echo "  deploy      - Deploy the application"
-	@echo "  help        - Show this help information"
+	@echo ""
+	@echo "Legacy Docker Compose (use main commands instead):"
+	@echo "  compose-up  - Start with Docker Compose"
+	@echo "  compose-down - Stop Docker Compose services"
+	@echo "  compose-logs - Show Docker Compose logs"
+	@echo ""
+	@echo "Environment Variables:"
+	@echo "  PORT        - Set custom port (default: 8080)"
+	@echo "               Usage: PORT=3000 make dev"
+	@echo ""
+	@echo "Typical Workflow:"
+	@echo "  make dev    # Start development (foreground, Ctrl+C to stop)"
+	@echo "  make run    # Start production (background)"
+	@echo "  make stop   # Stop running containers"
+	@echo "  make clean  # Remove containers when done"
 
 # Default target
 .DEFAULT_GOAL := help

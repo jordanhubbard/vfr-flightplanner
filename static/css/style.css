@@ -26,18 +26,151 @@ header h1 {
     margin-bottom: 10px;
 }
 
-.controls {
+/* Weather Forecast Controls (moved to top) */
+.forecast-controls {
     background-color: white;
-    padding: 15px;
+    padding: 20px;
     border-radius: 8px;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
     margin-bottom: 20px;
 }
 
-.slider-container {
+.forecast-header {
+    margin-bottom: 20px;
+}
+
+.forecast-header h2 {
+    color: #2c3e50;
+    margin-bottom: 10px;
+}
+
+/* Date Selector Styles */
+.date-selector {
+    margin-bottom: 20px;
+    padding: 15px;
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    border: 1px solid #e9ecef;
+}
+
+.date-controls {
     display: flex;
     align-items: center;
+    justify-content: center;
     gap: 15px;
+}
+
+.date-display {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background-color: white;
+    padding: 8px 12px;
+    border-radius: 6px;
+    border: 1px solid #ddd;
+}
+
+.date-input {
+    border: none;
+    outline: none;
+    font-size: 16px;
+    font-weight: 500;
+    color: #2c3e50;
+    background: transparent;
+}
+
+.nav-button {
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    font-size: 18px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.nav-button:hover {
+    background-color: #0056b3;
+    transform: scale(1.05);
+}
+
+.nav-button:disabled {
+    background-color: #6c757d;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.today-btn {
+    background-color: #28a745;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 6px 12px;
+    font-size: 14px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.today-btn:hover {
+    background-color: #218838;
+}
+
+/* Weather Overlays Section */
+.weather-overlays {
+    margin-bottom: 20px;
+    padding: 15px;
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    border: 1px solid #e9ecef;
+}
+
+/* Area Forecast Section */
+.area-forecast {
+    margin-bottom: 20px;
+    padding: 15px;
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    border: 1px solid #e9ecef;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.area-forecast label {
+    font-weight: 500;
+    color: #2c3e50;
+    white-space: nowrap;
+}
+
+#area-forecast-airport {
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+    text-transform: uppercase;
+    min-width: 120px;
+}
+
+.btn-primary {
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 8px 16px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background-color 0.2s;
+}
+
+.btn-primary:hover {
+    background-color: #0056b3;
 }
 
 input[type="range"] {
@@ -61,7 +194,7 @@ input[type="range"] {
 }
 
 #map {
-    height: 500px;
+    height: 600px;
     border-radius: 8px;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
     width: 100%;
@@ -450,26 +583,6 @@ input[type="range"] {
     gap: 10px;
 }
 
-.nav-button {
-    background-color: #007bff;
-    color: white;
-    border: none;
-    border-radius: 4px;
-    padding: 5px 10px;
-    cursor: pointer;
-    font-size: 16px;
-    transition: background-color 0.2s;
-}
-
-.nav-button:hover {
-    background-color: #0056b3;
-}
-
-.nav-button:disabled {
-    background-color: #ccc;
-    cursor: not-allowed;
-}
-
 #overlay-date {
     font-size: 16px;
     font-weight: 500;
@@ -575,4 +688,95 @@ input[type="range"] {
 .forecast-table td:nth-child(7)[data-ceiling="Unknown"] {
     color: #95a5a6;
     font-weight: 500;
+}
+
+/* Airport Status Section */
+.airport-status {
+    margin-bottom: 15px;
+    padding: 12px 15px;
+    background-color: #f8f9fa;
+    border-radius: 6px;
+    border: 1px solid #e9ecef;
+}
+
+.status-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 14px;
+}
+
+.status-icon {
+    font-size: 16px;
+    font-weight: bold;
+    color: #28a745;
+}
+
+.status-icon.error {
+    color: #dc3545;
+}
+
+.status-text {
+    flex-grow: 1;
+    color: #2c3e50;
+}
+
+.loading-text {
+    color: #6c757d;
+    font-style: italic;
+}
+
+/* Loading Spinner */
+.loading-spinner {
+    width: 16px;
+    height: 16px;
+    border: 2px solid #e9ecef;
+    border-left: 2px solid #007bff;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Refresh Button */
+.refresh-btn {
+    background-color: transparent;
+    border: 1px solid #6c757d;
+    border-radius: 4px;
+    padding: 4px 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 14px;
+    color: #6c757d;
+}
+
+.refresh-btn:hover {
+    background-color: #f8f9fa;
+    border-color: #495057;
+    color: #495057;
+}
+
+.refresh-btn:active {
+    background-color: #e9ecef;
+}
+
+.refresh-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.refresh-icon {
+    display: inline-block;
+    transition: transform 0.3s ease;
+}
+
+.refresh-btn:hover .refresh-icon {
+    transform: rotate(180deg);
+}
+
+.refresh-btn.refreshing .refresh-icon {
+    animation: spin 1s linear infinite;
 } 

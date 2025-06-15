@@ -15,7 +15,7 @@
 <body>
     <div class="container">
         <header>
-            <h1>Flight Planner</h1>
+            <h1>Weather Forecaster</h1>
             <div class="api-status">
                 <div class="status-indicator" id="owm-indicator">
                     <span class="status-label">OpenWeatherMap API:</span>
@@ -43,96 +43,53 @@
             </div>
         </header>
         
-        <div class="main-content">
-            <div id="flight-planner">
-                <h2>Flight Planner</h2>
-                <form id="flight-plan-form">
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="from-airport">From (ICAO):</label>
-                            <input type="text" id="from-airport" maxlength="4" required placeholder="KPAO">
-                        </div>
-                        <div class="form-group">
-                            <label for="to-airport">To (ICAO):</label>
-                            <input type="text" id="to-airport" maxlength="4" required placeholder="7S5">
-                        </div>
+        <!-- Weather Forecast Controls (Moved to Top) -->
+        <div class="forecast-controls">
+            <div class="forecast-header">
+                <h2>Weather Forecast</h2>
+                <div class="location-controls">
+                    <div class="airport-search">
+                        <input type="text" id="airport-code" placeholder="Enter airport code (e.g., KLAX)" maxlength="4">
+                        <button id="go-airport">Go</button>
                     </div>
-                    
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="aircraft-range">Range (nm):</label>
-                            <input type="number" id="aircraft-range" min="50" max="1200" step="1" value="400" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="groundspeed">Groundspeed (kt):</label>
-                            <input type="number" id="groundspeed" min="50" max="300" step="1" value="120" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="cruising-altitude">Cruising Altitude (ft):</label>
-                            <input type="number" id="cruising-altitude" min="1000" max="17500" step="500" value="6500" required>
-                        </div>
-                    </div>
-                    
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="fuel-capacity">Fuel Capacity (gal):</label>
-                            <input type="number" id="fuel-capacity" min="10" max="500" step="1" value="50" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="fuel-burn-rate">Fuel Burn (GPH):</label>
-                            <input type="number" id="fuel-burn-rate" min="5" max="50" step="0.5" value="12" required>
-                        </div>
-                    </div>
-                    
-                    <div class="form-row">
-                        <div class="checkbox-group">
-                            <label>
-                                <input type="checkbox" id="avoid-terrain">
-                                Avoid high terrain (up to 20% longer route)
-                            </label>
-                            <label>
-                                <input type="checkbox" id="plan-fuel-stops" checked>
-                                Plan fuel stops (30 min reserve)
-                            </label>
-                        </div>
-                    </div>
-                    
-                    <button type="submit">Plan Flight</button>
-                </form>
-                <div id="route-summary"></div>
-                
-                <!-- Flight Leg Table -->
-                <div id="flight-legs-container" style="display: none;">
-                    <h3>Flight Legs</h3>
-                    <table id="flight-legs-table">
-                        <thead>
-                            <tr>
-                                <th>Leg</th>
-                                <th>From</th>
-                                <th>To</th>
-                                <th>Distance</th>
-                                <th>Altitude</th>
-                                <th>Time</th>
-                                <th>Wind</th>
-                                <th>Fuel Used</th>
-                                <th>Fuel Remaining</th>
-                                <th>Type</th>
-                            </tr>
-                        </thead>
-                        <tbody id="flight-legs-tbody">
-                        </tbody>
-                    </table>
+                    <p id="selected-location">Click on the map to select a location</p>
                 </div>
             </div>
-
-            <!-- Weather Controls (moved below flight planning) -->
-            <div class="controls">
-                <div class="control-group">
-                    <label for="forecast-days">Forecast Days:</label>
-                    <input type="range" id="forecast-days" min="1" max="16" value="7">
-                    <span id="days-value">7</span>
+            
+            <!-- Airport Data Status -->
+            <div class="airport-status" id="airport-status">
+                <div class="status-item" id="airport-loading" style="display: none;">
+                    <div class="loading-spinner"></div>
+                    <span class="loading-text">Loading airport data...</span>
                 </div>
-                
+                <div class="status-item" id="airport-ready" style="display: none;">
+                    <span class="status-icon">✓</span>
+                    <span class="status-text">Airport data ready (<span id="airport-count">0</span> airports)</span>
+                    <button id="refresh-airports" class="refresh-btn" title="Refresh airport data">
+                        <span class="refresh-icon">↻</span>
+                    </button>
+                </div>
+                <div class="status-item" id="airport-error" style="display: none;">
+                    <span class="status-icon error">⚠</span>
+                    <span class="status-text">Airport data unavailable</span>
+                    <button id="refresh-airports-error" class="refresh-btn" title="Try to load airport data">
+                        <span class="refresh-icon">↻</span>
+                    </button>
+                </div>
+            </div>
+            
+            <div class="date-selector">
+                <div class="date-controls">
+                    <button id="prev-date" class="nav-button">‹</button>
+                    <div class="date-display">
+                        <input type="date" id="forecast-date" class="date-input">
+                        <button id="today-button" class="today-btn">Today</button>
+                    </div>
+                    <button id="next-date" class="nav-button">›</button>
+                </div>
+            </div>
+            
+            <div class="weather-overlays">
                 <div class="control-group">
                     <label for="overlay-opacity">Overlay Opacity:</label>
                     <input type="range" id="overlay-opacity" min="0" max="100" value="70">
@@ -150,7 +107,7 @@
                             Precipitation
                         </label>
                         <label>
-                            <input type="checkbox" id="wind-overlay">
+                            <input type="checkbox" id="wind-overlay" checked>
                             Wind
                         </label>
                         <label>
@@ -163,25 +120,20 @@
                         </label>
                     </div>
                 </div>
-                
-                <!-- Area Forecast for Single Airport -->
-                <div class="control-group">
-                    <label>Area Forecast (50nm radius):</label>
-                    <div class="airport-search">
-                        <input type="text" id="area-forecast-airport" placeholder="Enter airport code (e.g., KLAX)" maxlength="4">
-                        <button id="area-forecast-btn">Get Area Forecast</button>
-                    </div>
-                </div>
             </div>
             
-            <div id="map"></div>
-            <div id="weather-info">
-                <div class="weather-header">
-                    <h2>Weather Information</h2>
-                    <p id="selected-location">Click on the map to select a location</p>
-                </div>
-                <div id="forecast-container"></div>
+            <div class="area-forecast">
+                <label>Area Forecast (50nm radius):</label>
+                <input type="text" id="area-forecast-airport" placeholder="ENTER AIRPORT">
+                <button id="get-area-forecast" class="btn-primary">Get Area Forecast</button>
             </div>
+            
+            <div id="forecast-container"></div>
+        </div>
+        
+        <!-- Flight Planner (Map) -->
+        <div class="main-content">
+            <div id="map"></div>
         </div>
     </div>
 
