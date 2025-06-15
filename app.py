@@ -1069,8 +1069,8 @@ def refresh_airport_cache():
                 # Run the airport cache update scripts
                 app.logger.info("Starting manual airport cache refresh...")
                 
-                # Update OpenAIP cache
-                result1 = subprocess.run(['python3', '/app/scripts/update_airport_cache.py'], 
+                # Update OpenAIP cache with force flag
+                result1 = subprocess.run(['python3', '/app/scripts/update_airport_cache.py', '--force'], 
                                        capture_output=True, text=True, timeout=120)
                 app.logger.info(f"OpenAIP update result: {result1.returncode}, stdout: {result1.stdout}, stderr: {result1.stderr}")
                 

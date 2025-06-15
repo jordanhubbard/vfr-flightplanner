@@ -17,22 +17,26 @@ if [ -z "${OPENWEATHERMAP_API_KEY}" ]; then
     echo "Weather overlay features will be limited."
 fi
 
-# Use absolute path for OurAirports CSV
+# Use absolute path for airport cache
+AIRPORT_CACHE="/app/app/models/airports_cache.json"
 AIRPORTS_CSV="/app/xctry-planner/backend/airports.csv"
 
-# Update airport cache on container startup
-python3 /app/scripts/update_airport_cache.py
-
-# Fetch OurAirports CSV if missing (Python-based, robust)
-if [ ! -f "$AIRPORTS_CSV" ]; then
-  python3 /app/scripts/fetch_ourairports_csv.py
+# Only update airport cache if it doesn't exist or is empty
+if [ ! -f "$AIRPORT_CACHE" ] || [ ! -s "$AIRPORT_CACHE" ]; then
+    echo "Airport cache missing or empty. Downloading airport data..."
+    python3 /app/scripts/update_airport_cache.py
+    
+    # Fetch OurAirports CSV if missing (Python-based, robust)
+    if [ ! -f "$AIRPORTS_CSV" ]; then
+        python3 /app/scripts/fetch_ourairports_csv.py
+    fi
+    
+    # Merge with OurAirports CSV for full coverage
+    python3 /app/scripts/merge_airport_datasets.py
+else
+    echo "Airport cache exists with $(wc -l < "$AIRPORT_CACHE" 2>/dev/null || echo "unknown") entries. Skipping download."
+    echo "Use the refresh button in the UI to update airport data."
 fi
-
-# Debug: List the OurAirports CSV file (if present)
-ls -l "$AIRPORTS_CSV" || true
-
-# Merge with OurAirports CSV for full coverage
-python3 /app/scripts/merge_airport_datasets.py
 
 # Run gunicorn with specified port
 exec gunicorn --bind 0.0.0.0:${PORT} --workers 2 --threads 4 --timeout 60 "app:create_app()"

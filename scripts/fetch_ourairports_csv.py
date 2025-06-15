@@ -1,6 +1,10 @@
 import os
 import requests
 import logging
+import urllib3
+
+# Suppress SSL warnings when using verify=False
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 URL = "https://ourairports.com/data/airports.csv"
 DEST = os.environ.get("OURAIRPORTS_CSV", "/app/xctry-planner/backend/airports.csv")
@@ -12,7 +16,11 @@ def fetch_csv(url=URL, dest=DEST):
     os.makedirs(os.path.dirname(dest), exist_ok=True)
     logger.info(f"Fetching OurAirports CSV from {url} ...")
     try:
-        resp = requests.get(url, timeout=30)
+        # Add SSL verification bypass and user agent to avoid SSL certificate issues
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        }
+        resp = requests.get(url, timeout=30, verify=False, headers=headers)
         resp.raise_for_status()
         with open(dest, "wb") as f:
             f.write(resp.content)

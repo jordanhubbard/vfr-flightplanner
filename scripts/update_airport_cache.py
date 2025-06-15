@@ -48,9 +48,20 @@ def download_all_airports():
     return all_items
 
 def main():
+    import sys
+    
+    # Check if we should force refresh
+    force_refresh = '--force' in sys.argv
+    
+    # Check if cache already exists and is not empty
+    if not force_refresh and os.path.exists(CACHE_FILE) and os.path.getsize(CACHE_FILE) > 100:
+        logger.info(f"Airport cache already exists at {CACHE_FILE}. Use --force to refresh.")
+        return
+    
     if not OPENAIP_API_KEY:
         logger.error("OPENAIP_API_KEY not set. Exiting.")
         return
+        
     logger.info("Downloading airport data from OpenAIP...")
     try:
         airports = download_all_airports()
