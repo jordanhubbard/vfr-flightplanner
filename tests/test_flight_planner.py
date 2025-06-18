@@ -2,12 +2,7 @@ import pytest
 import json
 from app import create_app
 
-@pytest.fixture
-def client():
-    app = create_app()
-    app.config['TESTING'] = True
-    with app.test_client() as client:
-        yield client
+# Using client fixture from conftest.py
 
 def test_plan_route_kpao_7s5(client):
     """Test planning a VFR route between KPAO and 7S5 with realistic range and speed."""

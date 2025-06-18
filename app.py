@@ -1,29 +1,14 @@
-from flask import Flask, render_template, jsonify, request, send_from_directory
-import requests
 from dotenv import load_dotenv
 import os
-from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime, timedelta
-import logging
-import xml.etree.ElementTree as ET
-
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s [%(levelname)s] %(message)s',
-    datefmt='%Y-%m-%d %H:%M:%S',
-    handlers=[
-        logging.FileHandler('weather_data.log'),
-        logging.StreamHandler()  # Keep console output as well
-    ]
-)
-logger = logging.getLogger(__name__)
 
 # Load .env from the same directory as app.py
 load_dotenv(os.path.join(os.path.dirname(__file__), '.env'))
 
-app = Flask(__name__)
-app.config.from_object('config.DevelopmentConfig')
+# Use the app factory pattern
+from app import create_app
+from app.config import DevelopmentConfig
+
+app = create_app(DevelopmentConfig)
 
 # Counter for OpenWeatherMap API calls
 owm_api_calls = 0
@@ -54,122 +39,9 @@ def not_found_error(error):
         "message": f"The requested URL {request.path} was not found on the server"
     }), 404
 
-def check_owm_api():
-    """Check OpenWeatherMap API health"""
-    global owm_api_calls
-    api_key = os.getenv('OPENWEATHERMAP_API_KEY', '')
-    try:
-        if not api_key:
-            return {
-                'status': False,
-                'error': 'API key not configured',
-                'timestamp': datetime.now().isoformat(),
-                'api_calls': owm_api_calls
-            }
-            
-        response = requests.get(
-            f'https://api.openweathermap.org/data/2.5/weather?lat=0&lon=0&appid={api_key}',
-            timeout=5
-        )
-        
-        owm_api_calls += 1
-        
-        if response.status_code == 200:
-            return {
-                'status': True,
-                'error': None,
-                'timestamp': datetime.now().isoformat(),
-                'api_calls': owm_api_calls
-            }
-        elif response.status_code == 401:
-            return {
-                'status': False,
-                'error': 'Invalid API key',
-                'timestamp': datetime.now().isoformat(),
-                'api_calls': owm_api_calls
-            }
-        else:
-            return {
-                'status': False,
-                'error': f'API returned status code {response.status_code}',
-                'timestamp': datetime.now().isoformat(),
-                'api_calls': owm_api_calls
-            }
-    except requests.exceptions.Timeout:
-        return {
-            'status': False,
-            'error': 'Request timed out after 5 seconds',
-            'timestamp': datetime.now().isoformat(),
-            'api_calls': owm_api_calls
-        }
-    except requests.exceptions.ConnectionError:
-        return {
-            'status': False,
-            'error': 'Failed to connect to the API',
-            'timestamp': datetime.now().isoformat(),
-            'api_calls': owm_api_calls
-        }
-    except Exception as e:
-        return {
-            'status': False,
-            'error': str(e),
-            'timestamp': datetime.now().isoformat(),
-            'api_calls': owm_api_calls
-        }
 
-def check_meteo_api():
-    """Check Open-Meteo API health"""
-    try:
-        response = requests.get(
-            'https://api.open-meteo.com/v1/forecast?latitude=0&longitude=0',
-            timeout=5
-        )
-        
-        if response.status_code == 200:
-            return {
-                'status': True,
-                'error': None,
-                'timestamp': datetime.now().isoformat()
-            }
-        else:
-            return {
-                'status': False,
-                'error': f'API returned status code {response.status_code}',
-                'timestamp': datetime.now().isoformat()
-            }
-    except requests.exceptions.Timeout:
-        return {
-            'status': False,
-            'error': 'Request timed out after 5 seconds',
-            'timestamp': datetime.now().isoformat()
-        }
-    except requests.exceptions.ConnectionError:
-        return {
-            'status': False,
-            'error': 'Failed to connect to the API',
-            'timestamp': datetime.now().isoformat()
-        }
-    except Exception as e:
-        return {
-            'status': False,
-            'error': str(e),
-            'timestamp': datetime.now().isoformat()
-        }
 
-@app.route('/api/health')
-def api_health():
-    """Check health of all required APIs"""
-    with ThreadPoolExecutor(max_workers=2) as executor:
-        owm_future = executor.submit(check_owm_api)
-        meteo_future = executor.submit(check_meteo_api)
-        
-        owm_result = owm_future.result()
-        meteo_result = meteo_future.result()
-        
-        return jsonify({
-            'openweathermap': owm_result,
-            'openmeteo': meteo_result
-        })
+
 
 @app.route('/')
 def index():

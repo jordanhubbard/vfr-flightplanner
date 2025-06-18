@@ -1,12 +1,7 @@
 import pytest
 from app import create_app
 
-@pytest.fixture
-def client():
-    app = create_app()
-    app.config['TESTING'] = True
-    with app.test_client() as client:
-        yield client
+# Using client fixture from conftest.py
 
 def test_index_page(client):
     """Test the root UI endpoint returns 200 and contains expected content."""

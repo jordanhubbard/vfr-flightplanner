@@ -2,16 +2,7 @@ import pytest
 from app import create_app
 from app.config import TestingConfig
 
-@pytest.fixture
-def app():
-    """Create and configure a Flask app for testing."""
-    app = create_app(TestingConfig)
-    yield app
-
-@pytest.fixture
-def client(app):
-    """A test client for the app."""
-    return app.test_client()
+# Using app and client fixtures from conftest.py
 
 def test_index_page(client):
     """Test that the index page loads."""
