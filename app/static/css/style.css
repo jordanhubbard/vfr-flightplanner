@@ -383,8 +383,6 @@ header h1 {
     align-items: center;
 }
 
-
-
 .btn-primary {
     background-color: #007bff;
     color: white;
@@ -1098,8 +1096,6 @@ input[type="range"] {
     animation: spin 1s linear infinite;
 }
 
-
-
 /* Flight planner loading */
 .flight-planner-controls.loading {
     position: relative;
@@ -1369,9 +1365,6 @@ input[type="range"] {
 }
 
 /* Weather Legend */
-.main-content {
-    position: relative;
-}
 
 .weather-legend {
     position: absolute;
@@ -1461,5 +1454,270 @@ input[type="range"] {
     
     .legend-item span {
         font-size: 10px;
+    }
+}
+
+/* Top Controls Layout */
+.top-controls {
+    background: #f8f9fa;
+    border-bottom: 1px solid #dee2e6;
+    padding: 12px 20px;
+}
+
+.date-forecast-controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 20px;
+    margin-bottom: 12px;
+}
+
+.date-selector {
+    flex-shrink: 0;
+}
+
+.location-controls {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    flex-grow: 1;
+    justify-content: flex-end;
+}
+
+.location-controls .airport-search {
+    display: flex;
+    gap: 8px;
+}
+
+.location-controls #selected-location {
+    margin: 0;
+    font-size: 14px;
+    color: #6c757d;
+    white-space: nowrap;
+}
+
+/* Map Container with Sidebar */
+.map-container {
+    display: flex;
+    height: 500px;
+    position: relative;
+}
+
+.map-sidebar {
+    width: 200px;
+    background: rgba(255, 255, 255, 0.95);
+    border-right: 1px solid #dee2e6;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    z-index: 1000;
+    box-shadow: 2px 0 4px rgba(0, 0, 0, 0.1);
+}
+
+.sidebar-section h3 {
+    margin: 0 0 12px 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: #495057;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.overlay-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.overlay-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    padding: 4px 0;
+    transition: background-color 0.2s ease;
+    border-radius: 4px;
+    padding: 4px 8px;
+}
+
+.overlay-item:hover {
+    background-color: rgba(0, 123, 255, 0.1);
+}
+
+.overlay-item input[type="checkbox"] {
+    margin: 0;
+    transform: scale(1.1);
+}
+
+.overlay-label {
+    font-size: 13px;
+    color: #495057;
+    user-select: none;
+}
+
+/* Vertical Opacity Slider */
+.opacity-control {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    height: 120px;
+}
+
+.vertical-slider {
+    -webkit-appearance: slider-vertical; /* WebKit */
+    width: 20px;
+    height: 100px;
+    background: transparent;
+    outline: none;
+    cursor: pointer;
+}
+
+.vertical-slider::-webkit-slider-track {
+    width: 4px;
+    height: 100px;
+    background: #ddd;
+    border-radius: 2px;
+}
+
+.vertical-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    background: #007bff;
+    border-radius: 50%;
+    cursor: pointer;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.vertical-slider::-moz-range-track {
+    width: 4px;
+    height: 100px;
+    background: #ddd;
+    border-radius: 2px;
+    border: none;
+}
+
+.vertical-slider::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    background: #007bff;
+    border-radius: 50%;
+    cursor: pointer;
+    border: none;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.opacity-labels {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    height: 100px;
+    font-size: 11px;
+    color: #6c757d;
+}
+
+/* Main Content (Map) */
+.main-content {
+    flex: 1;
+    position: relative;
+}
+
+#map {
+    width: 100%;
+    height: 100%;
+}
+
+/* Weather Legend Positioning */
+.weather-legend {
+    top: 10px;
+    right: 10px;
+}
+
+/* Forecast Display */
+.forecast-display {
+    background: #f8f9fa;
+    border-top: 1px solid #dee2e6;
+    padding: 20px;
+}
+
+/* Responsive Design */
+@media (max-width: 1024px) {
+    .map-sidebar {
+        width: 160px;
+        padding: 12px;
+    }
+    
+    .sidebar-section h3 {
+        font-size: 12px;
+    }
+    
+    .overlay-label {
+        font-size: 12px;
+    }
+}
+
+@media (max-width: 768px) {
+    .map-container {
+        flex-direction: column;
+        height: auto;
+    }
+    
+    .map-sidebar {
+        width: 100%;
+        flex-direction: row;
+        height: auto;
+        padding: 12px;
+        gap: 20px;
+        border-right: none;
+        border-bottom: 1px solid #dee2e6;
+    }
+    
+    .sidebar-section {
+        flex: 1;
+    }
+    
+    .overlay-controls {
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 12px;
+    }
+    
+    .opacity-control {
+        height: auto;
+        flex-direction: row;
+    }
+    
+    .vertical-slider {
+        -webkit-appearance: none;
+        width: 100px;
+        height: 20px;
+    }
+    
+    .vertical-slider::-webkit-slider-track {
+        width: 100px;
+        height: 4px;
+    }
+    
+    .opacity-labels {
+        flex-direction: row;
+        justify-content: space-between;
+        width: 100px;
+        height: auto;
+    }
+    
+    .main-content {
+        height: 400px;
+    }
+    
+    .date-forecast-controls {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 12px;
+    }
+    
+    .location-controls {
+        justify-content: center;
     }
 } 

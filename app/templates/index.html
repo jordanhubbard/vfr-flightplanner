@@ -43,43 +43,21 @@
             </div>
         </header>
         
-        <!-- Map (Moved to Top) -->
-        <div class="main-content">
-            <div id="map"></div>
-            
-            <!-- Weather Legend -->
-            <div class="weather-legend" id="weather-legend" style="display: none;">
-                <div class="legend-title">Airport Weather Conditions</div>
-                <div class="legend-items">
-                    <div class="legend-item">
-                        <div class="legend-dot vfr"></div>
-                        <span>VFR - Visual Flight Rules</span>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-dot mvfr"></div>
-                        <span>MVFR - Marginal VFR</span>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-dot ifr"></div>
-                        <span>IFR - Instrument Flight Rules</span>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-dot lifr"></div>
-                        <span>LIFR - Low IFR</span>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-dot unknown"></div>
-                        <span>Unknown - No Weather Data</span>
+        <!-- Date and Forecast Controls (Above Map) -->
+        <div class="top-controls">
+            <div class="date-forecast-controls">
+                <div class="date-selector">
+                    <div class="date-controls">
+                        <button id="prev-date" class="nav-button">‹</button>
+                        <div class="date-display">
+                            <input type="date" id="forecast-date" class="date-input">
+                            <button id="today-button" class="today-btn">Today</button>
+                        </div>
+                        <button id="next-date" class="nav-button">›</button>
                     </div>
                 </div>
-            </div>
-        </div>
-        
-        <!-- Weather Forecast Controls -->
-        <div class="forecast-controls">
-            <div class="forecast-header">
+                
                 <div class="location-controls">
-                    <h2>Weather Forecast</h2>
                     <div class="airport-search">
                         <input type="text" id="airport-code" placeholder="Enter airport code (e.g., KLAX)" maxlength="4">
                         <button id="go-airport">Go</button>
@@ -109,61 +87,86 @@
                     </button>
                 </div>
             </div>
-            
-            <!-- Row 1: Date Controls and Overlay Opacity -->
-            <div class="controls-row">
-                <div class="date-selector">
-                    <div class="date-controls">
-                        <button id="prev-date" class="nav-button">‹</button>
-                        <div class="date-display">
-                            <input type="date" id="forecast-date" class="date-input">
-                            <button id="today-button" class="today-btn">Today</button>
-                        </div>
-                        <button id="next-date" class="nav-button">›</button>
-                    </div>
-                </div>
-                
-                <div class="weather-overlays">
-                    <div class="control-group">
-                        <label for="overlay-opacity">Overlay Opacity:</label>
-                        <input type="range" id="overlay-opacity" min="0" max="100" value="70">
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Row 2: Weather Overlays and Area Forecast -->
-            <div class="controls-row">
-                <div class="weather-overlays">
-                    <div class="control-group">
-                        <label>Weather Overlays:</label>
-                        <div class="checkbox-group">
-                            <label>
-                                <input type="checkbox" id="clouds-overlay" checked>
-                                Clouds
-                            </label>
-                            <label>
-                                <input type="checkbox" id="precipitation-overlay">
-                                Precipitation
-                            </label>
-                            <label>
-                                <input type="checkbox" id="wind-overlay" checked>
-                                Wind
-                            </label>
-                            <label>
-                                <input type="checkbox" id="temp-overlay">
-                                Temperature
-                            </label>
-                            <label>
-                                <input type="checkbox" id="airports-overlay">
-                                Airports
-                            </label>
-                        </div>
-                    </div>
-                </div>
-                
+        </div>
 
+        <!-- Map with Sidebar -->
+        <div class="map-container">
+            <!-- Map Sidebar -->
+            <div class="map-sidebar">
+                <div class="sidebar-section">
+                    <h3>Overlays</h3>
+                    <div class="overlay-controls">
+                        <label class="overlay-item">
+                            <input type="checkbox" id="clouds-overlay" checked>
+                            <span class="overlay-label">Clouds</span>
+                        </label>
+                        <label class="overlay-item">
+                            <input type="checkbox" id="precipitation-overlay">
+                            <span class="overlay-label">Precipitation</span>
+                        </label>
+                        <label class="overlay-item">
+                            <input type="checkbox" id="wind-overlay" checked>
+                            <span class="overlay-label">Wind</span>
+                        </label>
+                        <label class="overlay-item">
+                            <input type="checkbox" id="temp-overlay">
+                            <span class="overlay-label">Temperature</span>
+                        </label>
+                        <label class="overlay-item">
+                            <input type="checkbox" id="airports-overlay">
+                            <span class="overlay-label">Airports</span>
+                        </label>
+                    </div>
+                </div>
+                
+                <div class="sidebar-section">
+                    <h3>Opacity</h3>
+                    <div class="opacity-control">
+                        <input type="range" id="overlay-opacity" min="0" max="100" value="70" class="vertical-slider">
+                        <div class="opacity-labels">
+                            <span>100%</span>
+                            <span>50%</span>
+                            <span>0%</span>
+                        </div>
+                    </div>
+                </div>
             </div>
             
+            <!-- Map -->
+            <div class="main-content">
+                <div id="map"></div>
+                
+                <!-- Weather Legend -->
+                <div class="weather-legend" id="weather-legend" style="display: none;">
+                    <div class="legend-title">Airport Weather Conditions</div>
+                    <div class="legend-items">
+                        <div class="legend-item">
+                            <div class="legend-dot vfr"></div>
+                            <span>VFR - Visual Flight Rules</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-dot mvfr"></div>
+                            <span>MVFR - Marginal VFR</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-dot ifr"></div>
+                            <span>IFR - Instrument Flight Rules</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-dot lifr"></div>
+                            <span>LIFR - Low IFR</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-dot unknown"></div>
+                            <span>Unknown - No Weather Data</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Weather Forecast Display -->
+        <div class="forecast-display">
             <div id="forecast-container"></div>
         </div>
         
