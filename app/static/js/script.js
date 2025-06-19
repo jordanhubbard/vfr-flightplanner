@@ -15,6 +15,146 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: ' OpenStreetMap contributors'
 }).addTo(map);
 
+// Loading and Toast Notification System
+class LoadingManager {
+    static showLoading(element, message = 'Loading...') {
+        if (typeof element === 'string') {
+            element = document.getElementById(element);
+        }
+        if (element) {
+            element.classList.add('loading');
+            if (message && element.dataset) {
+                element.dataset.loadingMessage = message;
+            }
+        }
+    }
+
+    static hideLoading(element) {
+        if (typeof element === 'string') {
+            element = document.getElementById(element);
+        }
+        if (element) {
+            element.classList.remove('loading');
+            if (element.dataset) {
+                delete element.dataset.loadingMessage;
+            }
+        }
+    }
+
+    static showButtonLoading(button, originalText) {
+        if (typeof button === 'string') {
+            button = document.getElementById(button);
+        }
+        if (button) {
+            button.classList.add('btn-loading');
+            button.disabled = true;
+            if (originalText) {
+                button.dataset.originalText = originalText;
+                const textSpan = button.querySelector('.btn-text') || button;
+                textSpan.textContent = 'Loading...';
+            }
+        }
+    }
+
+    static hideButtonLoading(button) {
+        if (typeof button === 'string') {
+            button = document.getElementById(button);
+        }
+        if (button) {
+            button.classList.remove('btn-loading');
+            button.disabled = false;
+            if (button.dataset.originalText) {
+                const textSpan = button.querySelector('.btn-text') || button;
+                textSpan.textContent = button.dataset.originalText;
+                delete button.dataset.originalText;
+            }
+        }
+    }
+}
+
+class ToastManager {
+    static container = null;
+
+    static init() {
+        this.container = document.getElementById('toast-container');
+        if (!this.container) {
+            this.container = document.createElement('div');
+            this.container.className = 'toast-container';
+            this.container.id = 'toast-container';
+            document.body.appendChild(this.container);
+        }
+    }
+
+    static show(message, type = 'info', duration = 5000) {
+        if (!this.container) this.init();
+
+        const toast = document.createElement('div');
+        toast.className = `toast ${type}`;
+        
+        const header = document.createElement('div');
+        header.className = 'toast-header';
+        
+        const body = document.createElement('div');
+        body.className = 'toast-body';
+        body.textContent = message;
+
+        // Set header based on type
+        switch (type) {
+            case 'success':
+                header.textContent = '✓ Success';
+                break;
+            case 'error':
+                header.textContent = '✗ Error';
+                break;
+            case 'warning':
+                header.textContent = '⚠ Warning';
+                break;
+            case 'info':
+            default:
+                header.textContent = 'ℹ Information';
+                break;
+        }
+
+        toast.appendChild(header);
+        toast.appendChild(body);
+        this.container.appendChild(toast);
+
+        // Show toast
+        setTimeout(() => toast.classList.add('show'), 100);
+
+        // Auto-hide toast
+        setTimeout(() => {
+            toast.classList.remove('show');
+            setTimeout(() => {
+                if (toast.parentNode) {
+                    toast.parentNode.removeChild(toast);
+                }
+            }, 300);
+        }, duration);
+
+        return toast;
+    }
+
+    static success(message, duration = 4000) {
+        return this.show(message, 'success', duration);
+    }
+
+    static error(message, duration = 6000) {
+        return this.show(message, 'error', duration);
+    }
+
+    static warning(message, duration = 5000) {
+        return this.show(message, 'warning', duration);
+    }
+
+    static info(message, duration = 4000) {
+        return this.show(message, 'info', duration);
+    }
+}
+
+// Initialize toast system
+ToastManager.init();
+
 // API Status elements
 const owmStatus = document.getElementById('owm-status');
 const meteoStatus = document.getElementById('meteo-status');
@@ -241,7 +381,7 @@ function updateAirportStatusUI(status) {
             airportStatusElements.ready.style.display = 'flex';
         }
         if (airportStatusElements.count) {
-            airportStatusElements.count.textContent = status.openaip_cache.airport_count || 0;
+            airportStatusElements.count.textContent = status.airport_cache.airport_count || 0;
         }
     } else if (status.overall_status === 'missing') {
         // Show loading or error based on whether we're currently refreshing
@@ -377,57 +517,7 @@ function enableRefreshButtons() {
 // Initialize airport status checking
 initializeAirportStatus();
 
-// Area forecast functionality
-const areaForecastInput = document.getElementById('area-forecast-airport');
-const areaForecastButton = document.getElementById('get-area-forecast');
 
-if (areaForecastButton) {
-    areaForecastButton.addEventListener('click', handleAreaForecast);
-}
-if (areaForecastInput) {
-    areaForecastInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') {
-            handleAreaForecast();
-        }
-    });
-}
-
-async function handleAreaForecast() {
-    const airportCode = areaForecastInput ? areaForecastInput.value.trim().toUpperCase() : '';
-    if (!airportCode) return;
-    
-    try {
-        const response = await fetch('/get_area_forecast', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ 
-                airport_code: airportCode,
-                forecast_date: currentForecastDate.toISOString().split('T')[0]
-            })
-        });
-        
-        if (!response.ok) {
-            throw new Error('Failed to get area forecast');
-        }
-        
-        const data = await response.json();
-        
-        // Display the area forecast results
-        displayAreaForecast(data);
-        
-    } catch (error) {
-        console.error('Error getting area forecast:', error);
-        alert('Failed to get area forecast. Please check the airport code.');
-    }
-}
-
-function displayAreaForecast(data) {
-    // This function would display the area forecast data
-    // Implementation depends on how you want to show the results
-    console.log('Area forecast data:', data);
-}
 
 // --- Flight Planner UI ---
 const flightPlanForm = document.getElementById('flight-plan-form');
@@ -441,6 +531,9 @@ let fuelStopMarkers = [];
 
 flightPlanForm.addEventListener('submit', async function(e) {
     e.preventDefault();
+    const flightPlannerSection = document.querySelector('.flight-planner-controls');
+    const submitButton = flightPlanForm.querySelector('button[type="submit"]');
+    
     // Clear previous route
     if (routePolyline) {
         map.removeLayer(routePolyline);
@@ -468,8 +561,15 @@ flightPlanForm.addEventListener('submit', async function(e) {
     
     if (!from || !to || isNaN(range) || isNaN(groundspeed) || isNaN(fuelCapacity) || isNaN(fuelBurnRate) || isNaN(cruisingAltitude)) {
         routeSummaryDiv.innerHTML = '<div class="error-message">All fields are required.</div>';
+        ToastManager.error('All fields are required.');
         return;
     }
+    
+    // Show loading state
+    LoadingManager.showButtonLoading(submitButton, 'Plan Flight');
+    flightPlannerSection.classList.add('loading');
+    ToastManager.info(`Planning flight route from ${from} to ${to}...`);
+    
     try {
         routeSummaryDiv.innerHTML = 'Planning route...';
         const response = await fetch('/api/plan_route', {
@@ -490,6 +590,7 @@ flightPlanForm.addEventListener('submit', async function(e) {
         const data = await response.json();
         if (!response.ok || data.error) {
             routeSummaryDiv.innerHTML = `<div class="error-message">${data.error || 'Failed to plan route.'}</div>`;
+            ToastManager.error(data.error || 'Failed to plan route.');
             return;
         }
         // Draw route polyline
@@ -582,8 +683,15 @@ flightPlanForm.addEventListener('submit', async function(e) {
         
         // Display route weather information in the flight legs table
         displayFlightLegsTable(data, fuelCapacity, fuelBurnRate, routeWeatherData);
+        
+        ToastManager.success(`Flight route planned successfully from ${from} to ${to}`);
     } catch (error) {
         routeSummaryDiv.innerHTML = `<div class="error-message">${error.message}</div>`;
+        ToastManager.error('Flight planning failed: ' + error.message);
+    } finally {
+        // Hide loading state
+        LoadingManager.hideButtonLoading(submitButton);
+        flightPlannerSection.classList.remove('loading');
     }
 });
 
@@ -829,8 +937,6 @@ function getWindDisplayWithBarb(windSpeed, windDirection, altitude = null) {
     return container;
 }
 
-
-
 // Weather overlay layers
 let weatherLayers = {
     clouds: L.tileLayer(`https://tile.openweathermap.org/map/clouds_new/{z}/{x}/{y}.png?appid=${API_KEY}`, {
@@ -894,16 +1000,17 @@ airportCodeInput.addEventListener('keypress', (e) => {
 
 async function handleAirportSearch() {
     const airportCode = airportCodeInput.value.trim().toUpperCase();
-    if (!airportCode) return;
+    if (!airportCode) {
+        ToastManager.warning('Please enter an airport code');
+        return;
+    }
+    
+    // Show loading state
+    LoadingManager.showButtonLoading(goAirportButton, 'Go');
+    ToastManager.info(`Searching for airport ${airportCode}...`);
     
     try {
-        const response = await fetch('/get_airport_coordinates', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ airport_code: airportCode })
-        });
+        const response = await fetch(`/api/airport?code=${airportCode}`);
         
         if (!response.ok) {
             throw new Error('Airport not found');
@@ -918,9 +1025,17 @@ async function handleAirportSearch() {
         updateSelectedLocation(lat, lon);
         await fetchWeatherData(lat, lon);
         
+        ToastManager.success(`Found airport ${airportCode}: ${data.name || 'Unknown Name'}`);
+        
+        // Clear the input
+        airportCodeInput.value = '';
+        
     } catch (error) {
         console.error('Error searching for airport:', error);
-        alert('Airport not found. Please check the airport code.');
+        ToastManager.error('Airport not found. Please check the airport code.');
+    } finally {
+        // Hide loading state
+        LoadingManager.hideButtonLoading(goAirportButton);
     }
 }
 
@@ -932,28 +1047,28 @@ map.on('click', async function(e) {
     // Update location display and marker
     updateSelectedLocation(lat, lon);
     
-    // Fetch weather data for the clicked location
+    // Fetch weather data for the clicked location (fetchWeatherData already has loading feedback)
     await fetchWeatherData(lat, lon);
 });
 
 // Function to get marker color based on flight category
 function getFlightCategoryColor(category) {
     switch (category) {
-        case 'VFR': return '#00ff00';  // Green
-        case 'MVFR': return '#0000ff'; // Blue
-        case 'IFR': return '#ff0000';  // Red
-        case 'LIFR': return '#ff00ff'; // Magenta
-        default: return '#808080';     // Grey
+        case 'VFR': return '#00C851';   // Aviation Green
+        case 'MVFR': return '#007CBA';  // Aviation Blue  
+        case 'IFR': return '#CC0000';   // Aviation Red
+        case 'LIFR': return '#AA00FF';  // Aviation Magenta/Purple
+        default: return '#6C757D';      // Gray for unknown
     }
 }
 
-// Function to create a dot icon
-function createDotIcon(color) {
+// Function to create a dot icon with aviation sectional chart styling
+function createDotIcon(color, category = 'Unknown') {
     return L.divIcon({
-        className: 'airport-dot',
-        html: `<div style="background-color: ${color}; width: 12px; height: 12px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 4px rgba(0,0,0,0.5);"></div>`,
-        iconSize: [12, 12],
-        iconAnchor: [6, 6]
+        className: 'airport-weather-dot',
+        html: `<div class="weather-dot" style="background-color: ${color};" title="${category}"></div>`,
+        iconSize: [14, 14],
+        iconAnchor: [7, 7]
     });
 }
 
@@ -980,6 +1095,10 @@ function formatCloudLayers(layers) {
 
 // Function to fetch and display airports
 async function fetchAirports(lat, lon) {
+    // Show loading feedback
+    LoadingManager.showLoading('map', 'Loading nearby airports...');
+    ToastManager.info('Loading nearby airports...');
+    
     try {
         const requestBody = {
             lat: lat,
@@ -1008,27 +1127,36 @@ async function fetchAirports(lat, lon) {
         
         // Add new airport markers
         data.airports.forEach(airport => {
-            // Get color based on flight category
-            const color = getFlightCategoryColor(airport.weather?.flight_category);
+            // Get flight category and color
+            const flightCategory = airport.weather?.flight_category || 'Unknown';
+            const color = getFlightCategoryColor(flightCategory);
             
             // Create tooltip text
-            const tooltipText = `${airport.name} (${airport.weather?.flight_category || 'Unknown'})
+            const tooltipText = `${airport.name} (${flightCategory})
 ${airport.weather?.ceiling_ft ? `Ceiling: ${formatCeiling(airport.weather?.ceiling_ft, airport.weather?.ceiling_layer)}` : airport.weather?.ceiling_layer === 'CLR' ? 'Ceiling: CLR' : 'No ceiling'}
 ${airport.weather?.wind_speed_kt ? `Winds: ${airport.weather.wind_speed_kt}kt at ${airport.weather.wind_dir_degrees}°` : 'Winds: N/A'}`;
             
             // Create marker with colored dot
             const marker = L.marker([airport.lat, airport.lon], {
-                icon: createDotIcon(color)
+                icon: createDotIcon(color, flightCategory)
             })
             .bindPopup(`
-                <strong>${airport.name}</strong><br>
-                ${airport.iata ? `IATA: ${airport.iata}<br>` : ''}
-                ${airport.icao ? `ICAO: ${airport.icao}<br>` : ''}
-                Type: ${airport.type}<br>
-                Flight Category: ${airport.weather?.flight_category || 'Unknown'}<br>
-                ${airport.weather?.ceiling_ft ? `Ceiling: ${formatCeiling(airport.weather?.ceiling_ft, airport.weather?.ceiling_layer)}` : airport.weather?.ceiling_layer === 'CLR' ? 'Ceiling: CLR' : 'No ceiling'}<br>
-                Visibility: ${formatVisibility(airport.weather?.visibility_sm)}<br>
-                Cloud Layers:<br>${formatCloudLayers(airport.weather?.all_layers)}
+                <div style="text-align: center; margin-bottom: 8px;">
+                    <strong>${airport.name}</strong><br>
+                    ${airport.iata ? `${airport.iata}` : ''}${airport.icao ? `${airport.iata ? ' / ' : ''}${airport.icao}` : ''}
+                </div>
+                <div style="text-align: center; margin-bottom: 8px;">
+                    <span style="background-color: ${color}; color: white; padding: 2px 8px; border-radius: 4px; font-weight: bold; font-size: 12px;">
+                        ${flightCategory}
+                    </span>
+                </div>
+                <div style="font-size: 12px;">
+                    <strong>Type:</strong> ${airport.type}<br>
+                    <strong>Ceiling:</strong> ${airport.weather?.ceiling_ft ? formatCeiling(airport.weather?.ceiling_ft, airport.weather?.ceiling_layer) : airport.weather?.ceiling_layer === 'CLR' ? 'CLR' : 'No ceiling'}<br>
+                    <strong>Visibility:</strong> ${formatVisibility(airport.weather?.visibility_sm)}<br>
+                    <strong>Winds:</strong> ${airport.weather?.wind_speed_kt ? `${airport.weather.wind_speed_kt}kt @ ${airport.weather.wind_dir_degrees}°` : 'N/A'}<br>
+                    <strong>Clouds:</strong><br>${formatCloudLayers(airport.weather?.all_layers)}
+                </div>
             `)
             .bindTooltip(tooltipText, {
                 permanent: false,
@@ -1044,8 +1172,19 @@ ${airport.weather?.wind_speed_kt ? `Winds: ${airport.weather.wind_speed_kt}kt at
             
             airportMarkers.push(marker);
         });
+        
+        ToastManager.success(`Loaded ${data.airports.length} nearby airports`);
+        
+        // Show weather legend if airports are displayed
+        if (overlayCheckboxes.airports.checked) {
+            document.getElementById('weather-legend').style.display = 'block';
+        }
     } catch (error) {
         console.error('Error fetching airports:', error);
+        ToastManager.error('Failed to load nearby airports: ' + error.message);
+    } finally {
+        // Hide loading state
+        LoadingManager.hideLoading('map');
     }
 }
 
@@ -1065,10 +1204,14 @@ Object.entries(overlayCheckboxes).forEach(([type, checkbox]) => {
                 // Handle airports overlay specially
                 if (e.target.checked && lastKnownPosition) {
                     fetchAirports(lastKnownPosition.lat, lastKnownPosition.lng);
+                    // Show weather legend
+                    document.getElementById('weather-legend').style.display = 'block';
                 } else if (!e.target.checked) {
                     // Clear airport markers when disabled
                     airportMarkers.forEach(marker => map.removeLayer(marker));
                     airportMarkers = [];
+                    // Hide weather legend
+                    document.getElementById('weather-legend').style.display = 'none';
                 }
             } else {
                 // Handle weather overlays
@@ -1114,6 +1257,13 @@ async function fetchWeatherData(lat = null, lon = null) {
         return null;
     }
     
+    // Show loading state for main weather display
+    const isMainWeatherRequest = !lat && !lon;
+    if (isMainWeatherRequest) {
+        LoadingManager.showLoading('weather-info', 'Loading weather data...');
+        ToastManager.info('Fetching weather data...');
+    }
+    
     try {
         const response = await fetch('/get_weather', {
             method: 'POST',
@@ -1135,8 +1285,10 @@ async function fetchWeatherData(lat = null, lon = null) {
         const data = await response.json();
         
         // Only update the display if this is for the current position
-        if (!lat && !lon) {
+        if (isMainWeatherRequest) {
+            LoadingManager.hideLoading('weather-info');
             displayWeatherData(data);
+            ToastManager.success('Weather data loaded successfully');
         }
         
         return data;
@@ -1144,11 +1296,13 @@ async function fetchWeatherData(lat = null, lon = null) {
         console.error('Error fetching weather data:', error);
         
         // Only show error in UI if this is for the current position
-        if (!lat && !lon) {
+        if (isMainWeatherRequest) {
+            LoadingManager.hideLoading('weather-info');
             const weatherContainer = document.getElementById('weather-info');
             if (weatherContainer) {
                 weatherContainer.innerHTML = '<div class="error-message">Failed to load weather data. Please try again.</div>';
             }
+            ToastManager.error('Failed to load weather data: ' + error.message);
         }
         
         return null;
@@ -1232,8 +1386,6 @@ function displayWeatherData(data) {
         }
     }
 }
-
- 
 
 // Function to update selected location display
 function updateSelectedLocation(lat, lon) {

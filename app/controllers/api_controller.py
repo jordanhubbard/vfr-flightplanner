@@ -214,3 +214,86 @@ def plan_route_api():
     except Exception as e:
         logger.error(f"Error in plan_route: {str(e)}")
         return jsonify({'error': 'Server error', 'message': str(e)}), 500
+
+@api_bp.route('/airport-cache-status')
+def airport_cache_status():
+    """Check the status of airport cache files"""
+    try:
+        # Adjust paths to work with the new project structure
+        cache_file = os.path.join(current_app.root_path, 'models', 'airports_cache.json')
+        
+        # Check if cache file exists and get its info
+        cache_exists = os.path.exists(cache_file)
+        
+        status = {
+            'airport_cache': {
+                'exists': cache_exists,
+                'size': os.path.getsize(cache_file) if cache_exists else 0,
+                'modified': datetime.fromtimestamp(os.path.getmtime(cache_file)).isoformat() if cache_exists else None,
+                'airport_count': 0
+            },
+            'overall_status': 'ready' if cache_exists else 'missing'
+        }
+        
+        # Count airports in cache if file exists
+        if cache_exists:
+            try:
+                import json
+                with open(cache_file, 'r') as f:
+                    airport_data = json.load(f)
+                    status['airport_cache']['airport_count'] = len(airport_data) if isinstance(airport_data, list) else 0
+            except Exception as e:
+                logger.error(f"Error reading airport cache: {e}")
+                
+        return jsonify(status)
+        
+    except Exception as e:
+        logger.error(f"Error checking airport cache status: {e}")
+        return jsonify({
+            'error': 'Failed to check airport cache status',
+            'details': str(e)
+        }), 500
+
+@api_bp.route('/refresh-airport-cache', methods=['POST'])
+def refresh_airport_cache():
+    """Manually trigger airport cache refresh"""
+    try:
+        import subprocess
+        import threading
+        
+        def run_refresh():
+            """Run airport cache refresh in background"""
+            try:
+                # Run the airport cache update scripts
+                logger.info("Starting manual airport cache refresh...")
+                
+                # Get the project root directory
+                project_root = os.path.dirname(os.path.dirname(current_app.root_path))
+                script_path = os.path.join(project_root, 'scripts', 'update_airport_cache.py')
+                
+                # Update airport cache with force flag
+                result = subprocess.run(['python3', script_path, '--force'], 
+                                       capture_output=True, text=True, timeout=120)
+                logger.info(f"Airport cache update result: {result.returncode}, stdout: {result.stdout}, stderr: {result.stderr}")
+                
+                logger.info("Airport cache refresh completed")
+                
+            except Exception as e:
+                logger.error(f"Error during airport cache refresh: {e}")
+        
+        # Start refresh in background thread
+        refresh_thread = threading.Thread(target=run_refresh)
+        refresh_thread.daemon = True
+        refresh_thread.start()
+        
+        return jsonify({
+            'status': 'started',
+            'message': 'Airport cache refresh started in background'
+        })
+        
+    except Exception as e:
+        logger.error(f"Error starting airport cache refresh: {e}")
+        return jsonify({
+            'error': 'Failed to start airport cache refresh',
+            'details': str(e)
+        }), 500

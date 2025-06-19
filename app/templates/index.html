@@ -43,7 +43,39 @@
             </div>
         </header>
         
-        <!-- Weather Forecast Controls (Moved to Top) -->
+        <!-- Map (Moved to Top) -->
+        <div class="main-content">
+            <div id="map"></div>
+            
+            <!-- Weather Legend -->
+            <div class="weather-legend" id="weather-legend" style="display: none;">
+                <div class="legend-title">Airport Weather Conditions</div>
+                <div class="legend-items">
+                    <div class="legend-item">
+                        <div class="legend-dot vfr"></div>
+                        <span>VFR - Visual Flight Rules</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-dot mvfr"></div>
+                        <span>MVFR - Marginal VFR</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-dot ifr"></div>
+                        <span>IFR - Instrument Flight Rules</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-dot lifr"></div>
+                        <span>LIFR - Low IFR</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-dot unknown"></div>
+                        <span>Unknown - No Weather Data</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Weather Forecast Controls -->
         <div class="forecast-controls">
             <div class="forecast-header">
                 <div class="location-controls">
@@ -129,11 +161,7 @@
                     </div>
                 </div>
                 
-                <div class="area-forecast">
-                    <label>Area Forecast (50nm radius):</label>
-                    <input type="text" id="area-forecast-airport" placeholder="ENTER AIRPORT">
-                    <button id="get-area-forecast" class="btn-primary">Get Area Forecast</button>
-                </div>
+
             </div>
             
             <div id="forecast-container"></div>
@@ -223,11 +251,11 @@
             </div>
         </div>
         
-        <!-- Flight Planner (Map) -->
-        <div class="main-content">
-            <div id="map"></div>
-        </div>
+
     </div>
+
+    <!-- Toast Notifications Container -->
+    <div class="toast-container" id="toast-container"></div>
 
     <!-- Initialize API key for weather overlays -->
     <script>
