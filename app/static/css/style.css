@@ -1720,4 +1720,30 @@ input[type="range"] {
     .location-controls {
         justify-content: center;
     }
+}
+
+/* Wind Barb Markers */
+.wind-barb-marker {
+    background: transparent !important;
+    border: none !important;
+}
+
+.wind-barb-marker svg {
+    pointer-events: none;
+}
+
+/* Wind Tooltip Styling */
+.wind-tooltip {
+    background: rgba(0, 0, 0, 0.8) !important;
+    color: white !important;
+    border: none !important;
+    border-radius: 4px !important;
+    padding: 4px 8px !important;
+    font-size: 11px !important;
+    font-weight: bold !important;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3) !important;
+}
+
+.wind-tooltip::before {
+    border-top-color: rgba(0, 0, 0, 0.8) !important;
 } 

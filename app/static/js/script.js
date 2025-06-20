@@ -236,6 +236,7 @@ setInterval(updateApiStatus, 30000);
 let currentMarker = null;
 let lastKnownPosition = null;
 let airportMarkers = [];  // Array to store airport markers
+let windBarbMarkers = [];  // Array to store wind barb markers
 let currentForecastDate = new Date(); // Track the current forecast date
 const opacitySlider = document.getElementById('overlay-opacity');
 const maxForecastDays = 16;  // Open-Meteo API limitation
@@ -1051,6 +1052,15 @@ map.on('click', async function(e) {
     await fetchWeatherData(lat, lon);
 });
 
+// Handle map view changes (pan/zoom) to update wind barbs
+map.on('moveend', function(e) {
+    // Only update wind barbs if wind overlay is enabled and we have a position
+    const windCheckbox = document.getElementById('wind-overlay');
+    if (windCheckbox && windCheckbox.checked && lastKnownPosition) {
+        fetchWindBarbs(lastKnownPosition.lat, lastKnownPosition.lng);
+    }
+});
+
 // Function to get marker color based on flight category
 function getFlightCategoryColor(category) {
     switch (category) {
@@ -1069,6 +1079,19 @@ function createDotIcon(color, category = 'Unknown') {
         html: `<div class="weather-dot" style="background-color: ${color};" title="${category}"></div>`,
         iconSize: [14, 14],
         iconAnchor: [7, 7]
+    });
+}
+
+// Function to create a wind barb icon for the map
+function createWindBarbIcon(windSpeed, windDirection) {
+    const windBarb = createWindBarb(windSpeed, windDirection, 40);
+    windBarb.style.filter = 'drop-shadow(1px 1px 2px rgba(0,0,0,0.5))';
+    
+    return L.divIcon({
+        className: 'wind-barb-marker',
+        html: windBarb.outerHTML,
+        iconSize: [40, 40],
+        iconAnchor: [20, 20]
     });
 }
 
@@ -1106,12 +1129,11 @@ async function fetchAirports(lat, lon) {
             radius: 50  // 50km radius
         };
         
-        const response = await fetch('/get_airports', {
-            method: 'POST',
+        const response = await fetch(`/api/airports?lat=${lat}&lon=${lon}&radius=${requestBody.radius}`, {
+            method: 'GET',
             headers: {
                 'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(requestBody)
+            }
         });
         
         if (!response.ok) {
@@ -1136,44 +1158,48 @@ async function fetchAirports(lat, lon) {
 ${airport.weather?.ceiling_ft ? `Ceiling: ${formatCeiling(airport.weather?.ceiling_ft, airport.weather?.ceiling_layer)}` : airport.weather?.ceiling_layer === 'CLR' ? 'Ceiling: CLR' : 'No ceiling'}
 ${airport.weather?.wind_speed_kt ? `Winds: ${airport.weather.wind_speed_kt}kt at ${airport.weather.wind_dir_degrees}°` : 'Winds: N/A'}`;
             
-            // Create marker with colored dot
-            const marker = L.marker([airport.lat, airport.lon], {
-                icon: createDotIcon(color, flightCategory)
-            })
-            .bindPopup(`
-                <div style="text-align: center; margin-bottom: 8px;">
-                    <strong>${airport.name}</strong><br>
-                    ${airport.iata ? `${airport.iata}` : ''}${airport.icao ? `${airport.iata ? ' / ' : ''}${airport.icao}` : ''}
-                </div>
-                <div style="text-align: center; margin-bottom: 8px;">
-                    <span style="background-color: ${color}; color: white; padding: 2px 8px; border-radius: 4px; font-weight: bold; font-size: 12px;">
-                        ${flightCategory}
-                    </span>
-                </div>
-                <div style="font-size: 12px;">
-                    <strong>Type:</strong> ${airport.type}<br>
-                    <strong>Ceiling:</strong> ${airport.weather?.ceiling_ft ? formatCeiling(airport.weather?.ceiling_ft, airport.weather?.ceiling_layer) : airport.weather?.ceiling_layer === 'CLR' ? 'CLR' : 'No ceiling'}<br>
-                    <strong>Visibility:</strong> ${formatVisibility(airport.weather?.visibility_sm)}<br>
-                    <strong>Winds:</strong> ${airport.weather?.wind_speed_kt ? `${airport.weather.wind_speed_kt}kt @ ${airport.weather.wind_dir_degrees}°` : 'N/A'}<br>
-                    <strong>Clouds:</strong><br>${formatCloudLayers(airport.weather?.all_layers)}
-                </div>
-            `)
-            .bindTooltip(tooltipText, {
-                permanent: false,
-                direction: 'top',
-                offset: [0, -8],
-                className: 'airport-tooltip'
-            });
-            
-            // Only add to map if airports overlay is checked
-            if (overlayCheckboxes.airports.checked) {
-                marker.addTo(map);
+            if (airport.latitude && airport.longitude) {
+                // Create marker with colored dot
+                const marker = L.marker([airport.latitude, airport.longitude], {
+                    icon: createDotIcon(color, flightCategory)
+                })
+                .bindPopup(`
+                    <div style="text-align: center; margin-bottom: 8px;">
+                        <strong>${airport.name}</strong><br>
+                        ${airport.iata ? `${airport.iata}` : ''}${airport.icao ? `${airport.iata ? ' / ' : ''}${airport.icao}` : ''}
+                    </div>
+                    <div style="text-align: center; margin-bottom: 8px;">
+                        <span style="background-color: ${color}; color: white; padding: 2px 8px; border-radius: 4px; font-weight: bold; font-size: 12px;">
+                            ${flightCategory}
+                        </span>
+                    </div>
+                    <div style="font-size: 12px;">
+                        <strong>Type:</strong> ${airport.type}<br>
+                        <strong>Ceiling:</strong> ${airport.weather?.ceiling_ft ? formatCeiling(airport.weather?.ceiling_ft, airport.weather?.ceiling_layer) : airport.weather?.ceiling_layer === 'CLR' ? 'CLR' : 'No ceiling'}<br>
+                        <strong>Visibility:</strong> ${formatVisibility(airport.weather?.visibility_sm)}<br>
+                        <strong>Winds:</strong> ${airport.weather?.wind_speed_kt ? `${airport.weather.wind_speed_kt}kt @ ${airport.weather.wind_dir_degrees}°` : 'N/A'}<br>
+                        <strong>Clouds:</strong><br>${formatCloudLayers(airport.weather?.all_layers)}
+                    </div>
+                `)
+                .bindTooltip(tooltipText, {
+                    permanent: false,
+                    direction: 'top',
+                    offset: [0, -8],
+                    className: 'airport-tooltip'
+                });
+                
+                // Only add to map if airports overlay is checked
+                if (overlayCheckboxes.airports.checked) {
+                    marker.addTo(map);
+                }
+                
+                airportMarkers.push(marker);
+            } else {
+                console.warn('Skipping airport with invalid coordinates:', airport);
             }
-            
-            airportMarkers.push(marker);
         });
         
-        ToastManager.success(`Loaded ${data.airports.length} nearby airports`);
+        ToastManager.success(`Loaded ${data.count} nearby airports`);
         
         // Show weather legend if airports are displayed
         if (overlayCheckboxes.airports.checked) {
@@ -1182,6 +1208,88 @@ ${airport.weather?.wind_speed_kt ? `Winds: ${airport.weather.wind_speed_kt}kt at
     } catch (error) {
         console.error('Error fetching airports:', error);
         ToastManager.error('Failed to load nearby airports: ' + error.message);
+    } finally {
+        // Hide loading state
+        LoadingManager.hideLoading('map');
+    }
+}
+
+// Function to fetch and display wind barbs on the map
+async function fetchWindBarbs(lat, lon) {
+    // Show loading feedback
+    LoadingManager.showLoading('map', 'Loading wind data...');
+    ToastManager.info('Loading wind barbs...');
+    
+    try {
+        // Create a grid of points around the current location
+        const bounds = map.getBounds();
+        const latStep = (bounds.getNorth() - bounds.getSouth()) / 6; // 6x6 grid
+        const lonStep = (bounds.getEast() - bounds.getWest()) / 6;
+        
+        // Clear existing wind barb markers
+        windBarbMarkers.forEach(marker => map.removeLayer(marker));
+        windBarbMarkers = [];
+        
+        const windPromises = [];
+        
+        // Create grid points
+        for (let i = 1; i < 6; i++) {
+            for (let j = 1; j < 6; j++) {
+                const gridLat = bounds.getSouth() + (latStep * i);
+                const gridLon = bounds.getWest() + (lonStep * j);
+                
+                windPromises.push(
+                    fetch('/get_weather', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            lat: gridLat,
+                            lon: gridLon
+                        })
+                    })
+                    .then(response => response.json())
+                    .then(data => ({
+                        lat: gridLat,
+                        lon: gridLon,
+                        windSpeed: data.current?.wind_speed_kt || 0,
+                        windDirection: data.current?.wind_dir_degrees || 0
+                    }))
+                    .catch(() => null)
+                );
+            }
+        }
+        
+        const windData = await Promise.all(windPromises);
+        
+        // Add wind barb markers for valid data
+        windData.forEach(point => {
+            if (point && point.windSpeed > 0) {
+                const marker = L.marker([point.lat, point.lon], {
+                    icon: createWindBarbIcon(point.windSpeed, point.windDirection)
+                })
+                .bindTooltip(`Wind: ${point.windDirection}° @ ${point.windSpeed}kt`, {
+                    permanent: false,
+                    direction: 'top',
+                    offset: [0, -20],
+                    className: 'wind-tooltip'
+                });
+                
+                // Only add to map if wind overlay is checked
+                if (overlayCheckboxes.wind.checked) {
+                    marker.addTo(map);
+                }
+                
+                windBarbMarkers.push(marker);
+            }
+        });
+        
+        ToastManager.success(`Loaded ${windBarbMarkers.length} wind barbs`);
+        
+    } catch (error) {
+        console.error('Error fetching wind data:', error);
+        ToastManager.error('Failed to load wind data: ' + error.message);
     } finally {
         // Hide loading state
         LoadingManager.hideLoading('map');
@@ -1213,8 +1321,24 @@ Object.entries(overlayCheckboxes).forEach(([type, checkbox]) => {
                     // Hide weather legend
                     document.getElementById('weather-legend').style.display = 'none';
                 }
+            } else if (type === 'wind') {
+                // Handle wind overlay specially for barbs
+                toggleOverlay(type, e.target.checked);
+                
+                if (e.target.checked && lastKnownPosition) {
+                    // Show wind barbs when wind overlay is enabled
+                    fetchWindBarbs(lastKnownPosition.lat, lastKnownPosition.lng);
+                } else if (!e.target.checked) {
+                    // Hide wind barbs when disabled
+                    windBarbMarkers.forEach(marker => map.removeLayer(marker));
+                }
+                
+                // Also refresh weather data if we have a location
+                if (lastKnownPosition) {
+                    fetchWeatherData();
+                }
             } else {
-                // Handle weather overlays
+                // Handle other weather overlays
                 toggleOverlay(type, e.target.checked);
                 
                 // Refresh weather data if we have a location
@@ -1408,6 +1532,12 @@ function updateSelectedLocation(lat, lon) {
     const airportsCheckbox = document.getElementById('airports-overlay');
     if (airportsCheckbox && airportsCheckbox.checked) {
         fetchAirports(lat, lon);
+    }
+    
+    // Fetch wind barbs if wind overlay is enabled
+    const windCheckbox = document.getElementById('wind-overlay');
+    if (windCheckbox && windCheckbox.checked) {
+        fetchWindBarbs(lat, lon);
     }
 }
 
