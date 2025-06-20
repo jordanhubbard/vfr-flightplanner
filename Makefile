@@ -5,23 +5,23 @@ PORT ?= 8080
 
 # Run the application in FOREGROUND for development
 dev:
-	docker-compose up --build
+	COMPOSE_BAKE=true docker compose up --build
 	@echo "Development mode stopped"
 
 # Run the application in BACKGROUND for deployment
 run:
-	docker-compose up --build -d
+	COMPOSE_BAKE=true docker compose up --build -d
 	@echo "Application started in background. Access it at http://localhost:$(PORT)"
 	@echo "Use 'make stop' to stop or 'make logs' to view logs"
 
 # Stop the running containers
 stop:
-	docker-compose down
+	COMPOSE_BAKE=true docker compose down
 	@echo "Application stopped"
 
 # Delete containers and clean up resources
 clean:
-	docker-compose down -v --remove-orphans --rmi local 2>/dev/null || true
+	COMPOSE_BAKE=true docker compose down -v --remove-orphans --rmi local 2>/dev/null || true
 	docker stop weather-forecasts-container 2>/dev/null || true
 	docker rm weather-forecasts-container 2>/dev/null || true
 	@find . -type d -name "__pycache__" -exec rm -r {} + 2>/dev/null || true
@@ -46,27 +46,27 @@ deep-clean: clean
 
 # Update airport cache using Python script (run inside container)
 airport-cache:
-	docker-compose run --rm web python scripts/update_airport_cache.py
+	COMPOSE_BAKE=true docker compose run --rm web python scripts/update_airport_cache.py
 
 # Check if web service is running
 check-service:
-	@docker-compose ps web | grep -q "Up" || { echo "Error: Container not running. Start with 'make run' or 'make dev' first"; exit 1; }
+	@COMPOSE_BAKE=true docker compose ps web | grep -q "Up" || { echo "Error: Container not running. Start with 'make run' or 'make dev' first"; exit 1; }
 
 # Run tests inside Docker container
 test: check-service
-	docker-compose exec web pytest tests/
+	COMPOSE_BAKE=true docker compose exec web pytest tests/
 
 # Run tests with coverage inside Docker container
 test-cov: check-service
-	docker-compose exec web pytest --cov=app tests/
+	COMPOSE_BAKE=true docker compose exec web pytest --cov=app tests/
 
 # Lint code inside Docker container
 lint:
-	docker-compose run --rm web flake8 app/ tests/
+	COMPOSE_BAKE=true docker compose run --rm web flake8 app/ tests/
 
 # Auto-fix lint issues where possible inside Docker container
 lint-fix:
-	docker-compose run --rm web autopep8 --in-place --recursive app/ tests/
+	COMPOSE_BAKE=true docker compose run --rm web autopep8 --in-place --recursive app/ tests/
 
 # Docker commands
 docker-build:
@@ -76,7 +76,7 @@ docker-build:
 bake:
 	docker buildx bake --file docker-bake.hcl
 
-# Run single Docker container (alternative to docker-compose)
+# Run single Docker container (alternative to COMPOSE_BAKE=true docker compose)
 docker-run: docker-build
 	docker stop weather-forecasts-container 2>/dev/null || true
 	docker rm weather-forecasts-container 2>/dev/null || true
@@ -88,7 +88,7 @@ docker-run: docker-build
 
 # Show container logs in real time
 logs:
-	docker-compose logs -f web
+	COMPOSE_BAKE=true docker compose logs -f web
 
 # Show single container logs
 docker-logs:
@@ -96,15 +96,15 @@ docker-logs:
 
 # Docker Compose commands (legacy - use main commands instead)
 compose-up:
-	docker-compose up --build -d
+	COMPOSE_BAKE=true docker compose up --build -d
 	@echo "Docker Compose services started. Access the application at http://localhost:$(PORT)"
 
 compose-down:
-	docker-compose down
+	COMPOSE_BAKE=true docker compose down
 	@echo "Docker Compose services stopped"
 
 compose-logs:
-	docker-compose logs -f
+	COMPOSE_BAKE=true docker compose logs -f
 
 # Initialize the application
 init: airport-cache
@@ -113,7 +113,7 @@ init: airport-cache
 # Load test data (runs inside container)
 test-data:
 	@echo "Loading test data..."
-	docker-compose run --rm web python -c "print('Test data loaded successfully')"
+	COMPOSE_BAKE=true docker compose run --rm web python -c "print('Test data loaded successfully')"
 
 # Deploy application
 deploy: test docker-build
@@ -123,7 +123,7 @@ deploy: test docker-build
 # Show application status
 status:
 	@echo "=== Docker Compose Services ==="
-	docker-compose ps
+	docker compose ps
 	@echo ""
 	@echo "=== Single Container Status ==="
 	docker ps --filter name=weather-forecasts-container --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}" 2>/dev/null || echo "No single container running"
