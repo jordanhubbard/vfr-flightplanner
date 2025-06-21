@@ -91,7 +91,7 @@ A comprehensive aviation flight planning application that combines advanced rout
 
    ```bash
    # Using Docker Compose (recommended)
-   docker-compose up -d
+   docker compose up -d
    ```
 
 ## Running the Application

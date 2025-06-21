@@ -39,7 +39,7 @@ flight-planner/
 ├── .dockerignore           # Docker ignore file
 ├── .env.example            # Example environment variables
 ├── .gitignore              # Git ignore file
-├── docker-compose.yml      # Docker Compose configuration
+├── docker compose.yml      # Docker Compose configuration
 ├── docker-entrypoint.sh    # Docker entrypoint script
 ├── Dockerfile              # Docker build configuration
 ├── Makefile                # Build automation
