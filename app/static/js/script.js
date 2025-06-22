@@ -1240,7 +1240,7 @@ async function fetchWindBarbs(lat, lon) {
                 const gridLon = bounds.getWest() + (lonStep * j);
                 
                 windPromises.push(
-                    fetch('/get_weather', {
+                    fetch('/api/weather', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',

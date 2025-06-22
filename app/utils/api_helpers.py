@@ -5,9 +5,6 @@ from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
-# Counter for OpenWeatherMap API calls
-owm_api_calls = 0
-
 def check_owm_api():
     """
     Check OpenWeatherMap API health.
@@ -15,65 +12,36 @@ def check_owm_api():
     Returns:
         dict: API health status
     """
-    global owm_api_calls
-    api_key = os.getenv('OPENWEATHERMAP_API_KEY', '')
+    api_key = os.getenv('OPENWEATHERMAP_API_KEY')
+    if not api_key:
+        return {
+            'status': False,
+            'error': 'OpenWeatherMap API key not set',
+            'timestamp': datetime.now().isoformat(),
+            'api_calls': 0
+        }
+        
+    api_calls = 0
     try:
-        if not api_key:
-            return {
-                'status': False,
-                'error': 'API key not configured',
-                'timestamp': datetime.now().isoformat(),
-                'api_calls': owm_api_calls
-            }
-            
-        response = requests.get(
-            f'https://api.openweathermap.org/data/2.5/weather?lat=0&lon=0&appid={api_key}',
-            timeout=5
-        )
+        # Increment API call counter
+        api_calls += 1
         
-        owm_api_calls += 1
+        # Make a simple API call to check status (e.g., get current weather for a fixed location)
+        url = f"https://api.openweathermap.org/data/2.5/weather?q=London&appid={api_key}"
+        response = requests.get(url, timeout=10)
+        response.raise_for_status()
         
-        if response.status_code == 200:
-            return {
-                'status': True,
-                'error': None,
-                'timestamp': datetime.now().isoformat(),
-                'api_calls': owm_api_calls
-            }
-        elif response.status_code == 401:
-            return {
-                'status': False,
-                'error': 'Invalid API key',
-                'timestamp': datetime.now().isoformat(),
-                'api_calls': owm_api_calls
-            }
-        else:
-            return {
-                'status': False,
-                'error': f'API returned status code {response.status_code}',
-                'timestamp': datetime.now().isoformat(),
-                'api_calls': owm_api_calls
-            }
-    except requests.exceptions.Timeout:
         return {
-            'status': False,
-            'error': 'Request timed out after 5 seconds',
+            'status': True,
             'timestamp': datetime.now().isoformat(),
-            'api_calls': owm_api_calls
+            'api_calls': api_calls
         }
-    except requests.exceptions.ConnectionError:
-        return {
-            'status': False,
-            'error': 'Failed to connect to the API',
-            'timestamp': datetime.now().isoformat(),
-            'api_calls': owm_api_calls
-        }
-    except Exception as e:
+    except requests.exceptions.RequestException as e:
         return {
             'status': False,
             'error': str(e),
             'timestamp': datetime.now().isoformat(),
-            'api_calls': owm_api_calls
+            'api_calls': api_calls
         }
 
 def check_meteo_api():

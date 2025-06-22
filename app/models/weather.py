@@ -53,7 +53,7 @@ def get_weather_data(lat, lon, days=7, overlays=None):
             },
             'hourly': meteo_data.get('hourly', {}),
             'daily': meteo_data.get('daily', {}),
-            'overlays': get_overlay_urls(lat, lon, overlays) if api_key else {}
+            'overlays': get_overlay_urls(lat, lon, overlays, api_key) if api_key else {}
         }
         
         return combined_data
@@ -181,6 +181,9 @@ def get_openweathermap_data(lat, lon, api_key):
     Returns:
         dict: Current weather data
     """
+    if not api_key:
+        return {'current': {}}
+        
     try:
         url = f"https://api.openweathermap.org/data/2.5/weather?lat={lat}&lon={lon}&appid={api_key}&units=imperial"
         
@@ -204,7 +207,7 @@ def get_openweathermap_data(lat, lon, api_key):
         logger.error(f"Error fetching OpenWeatherMap data: {str(e)}")
         return {'current': {}}
 
-def get_overlay_urls(lat, lon, overlays):
+def get_overlay_urls(lat, lon, overlays, api_key):
     """
     Generate URLs for weather map overlays.
     
@@ -212,12 +215,14 @@ def get_overlay_urls(lat, lon, overlays):
         lat (float): Latitude
         lon (float): Longitude
         overlays (list): List of active overlays
+        api_key (str): OpenWeatherMap API key
         
     Returns:
         dict: URLs for each requested overlay
     """
-    api_key = os.getenv('OPENWEATHERMAP_API_KEY', '')
-    
+    if not api_key:
+        return {}
+        
     # Base zoom level - can be adjusted based on user preference
     zoom = 10
     

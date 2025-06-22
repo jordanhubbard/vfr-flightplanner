@@ -76,18 +76,7 @@ def get_weather():
         if lat is None or lon is None:
             return jsonify({'error': 'Missing required parameters: lat, lon'}), 400
             
-        # Validate coordinates
-        try:
-            lat = float(lat)
-            lon = float(lon)
-            days = int(days)
-        except (ValueError, TypeError):
-            return jsonify({'error': 'Invalid coordinate or days format'}), 400
-            
-        if not (-90 <= lat <= 90) or not (-180 <= lon <= 180):
-            return jsonify({'error': 'Invalid coordinates'}), 400
-            
-        # Get weather data with fallback handling
+        # Get weather data
         weather_data = get_weather_data(lat, lon, days, overlays)
         
         if not weather_data:
@@ -129,6 +118,14 @@ def airports():
             
         # Get airports from the airport model
         airports_data = get_airports(lat, lon, radius)
+        
+        # Get METAR data for all airports
+        icao_codes = [airport['icao'] for airport in airports_data.get('airports', []) if airport.get('icao')]
+        if icao_codes:
+            metar_data = get_metar_data(icao_codes)
+            for airport in airports_data.get('airports', []):
+                if airport.get('icao') in metar_data:
+                    airport['weather'] = metar_data[airport['icao']]
         
         return jsonify(airports_data)
         
@@ -306,5 +303,84 @@ def refresh_airport_cache():
         logger.error(f"Error starting airport cache refresh: {e}")
         return jsonify({
             'error': 'Failed to start airport cache refresh',
+            'details': str(e)
+        }), 500
+
+@api_bp.route('/area_forecast', methods=['POST'])
+def get_area_forecast():
+    """Get area weather forecast for specified airport code"""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': 'No JSON data provided'}), 400
+            
+        airport_code = data.get('airport_code', '').strip().upper()
+        forecast_date = data.get('forecast_date')
+        
+        if not airport_code:
+            return jsonify({
+                'error': 'Missing airport code',
+                'details': 'Airport code is required'
+            }), 400
+            
+        # Get airport coordinates
+        airport_data = get_airport_coordinates(airport_code)
+        if not airport_data:
+            return jsonify({
+                'error': 'Airport not found',
+                'details': f'No airport found with code {airport_code}'
+            }), 404
+            
+        lat = airport_data['latitude']
+        lon = airport_data['longitude']
+        
+        # Calculate days from today to requested date
+        if forecast_date:
+            try:
+                requested_date = datetime.strptime(forecast_date, '%Y-%m-%d').date()
+                today = datetime.now().date()
+                days_from_today = (requested_date - today).days
+                if days_from_today < 0:
+                    return jsonify({
+                        'error': 'Invalid date',
+                        'details': 'Cannot request weather data for past dates'
+                    }), 400
+                days = max(days_from_today + 1, 7)
+            except ValueError:
+                return jsonify({
+                    'error': 'Invalid date format',
+                    'details': 'Date must be in YYYY-MM-DD format'
+                }), 400
+        else:
+            days = 7
+            
+        # Get weather data for the airport location
+        weather_data = get_weather_data(lat, lon, days, overlays=[])
+        
+        if not weather_data:
+            return jsonify({
+                'error': 'Failed to fetch weather data',
+                'details': 'Weather service temporarily unavailable'
+            }), 500
+            
+        # Add airport information to the response
+        response_data = {
+            'airport': {
+                'code': airport_code,
+                'name': airport_data.get('name', 'Unknown Airport'),
+                'latitude': lat,
+                'longitude': lon
+            },
+            'weather': weather_data,
+            'forecast_date': forecast_date,
+            'radius_nm': 50
+        }
+        
+        return jsonify(response_data)
+        
+    except Exception as e:
+        logger.error(f"Error in get_area_forecast: {str(e)}")
+        return jsonify({
+            'error': 'Internal server error',
             'details': str(e)
         }), 500

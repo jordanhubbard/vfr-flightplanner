@@ -16,6 +16,9 @@ HEADERS = {
 
 logger = logging.getLogger(__name__)
 
+# In-memory cache for airport data
+_airport_cache = None
+
 def calculate_distance(lat1, lon1, lat2, lon2):
     """
     Calculate the great circle distance between two points on Earth using Haversine formula.
@@ -123,16 +126,21 @@ def get_airports(lat, lon, radius=50):
         logger.error(f"Error using cached airport data: {str(e)}")
         return {'count': 0, 'airports': []}
 
-CACHE_PATH = os.path.join(os.path.dirname(__file__), 'airports_cache.json')
-
-_airport_cache = None
-
 def load_airport_cache():
+    """Load airport data from cache file."""
     global _airport_cache
     if _airport_cache is None:
         try:
-            with open(CACHE_PATH, 'r') as f:
+            cache_path = os.path.join(os.path.dirname(__file__), 'airports_cache.json')
+            with open(cache_path, 'r') as f:
                 _airport_cache = json.load(f)
+                logger.info(f"Loaded {len(_airport_cache)} airports from cache.")
+        except FileNotFoundError:
+            logger.error(f"Airport cache file not found at {cache_path}")
+            _airport_cache = []
+        except json.JSONDecodeError:
+            logger.error(f"Error decoding JSON from airport cache file: {cache_path}")
+            _airport_cache = []
         except Exception as e:
             logger.error(f"Error loading airport cache: {e}")
             _airport_cache = []
@@ -227,15 +235,24 @@ def get_metar_data(icao_codes):
         return {}
         
     try:
+        # Filter out any invalid or empty codes
+        valid_codes = [code for code in icao_codes if code and isinstance(code, str)]
+        if not valid_codes:
+            return {}
+            
         # Join ICAO codes for the API request
-        codes_str = ','.join(icao_codes)
+        codes_str = ','.join(valid_codes)
         
         # Call the ADDS API to get METAR data
         url = f"https://aviationweather.gov/adds/dataserver_current/httpparam?dataSource=metars&requestType=retrieve&format=xml&stationString={codes_str}&hoursBeforeNow=2"
-        response = requests.get(url, timeout=10)
+        response = requests.get(url, timeout=15) # Increased timeout
         
-        if response.status_code != 200:
+        # Check for no data response
+        if response.status_code == 200 and 'No data' in response.text:
+            logger.warning(f"No METAR data found for batch request: {codes_str}")
             return {}
+            
+        response.raise_for_status()
             
         # Parse the XML response
         root = ET.fromstring(response.content)
@@ -313,6 +330,18 @@ def get_metar_data(icao_codes):
                 
         return metars
         
+    except requests.exceptions.Timeout:
+        logger.warning(f"Timeout fetching METAR data for: {codes_str}. Retrying individually.")
+        # Fallback to individual requests on timeout
+        metars = {}
+        for code in valid_codes:
+            try:
+                individual_metar = get_metar_data([code])
+                if individual_metar:
+                    metars.update(individual_metar)
+            except Exception as e:
+                logger.error(f"Error fetching individual METAR for {code}: {str(e)}")
+        return metars
     except Exception as e:
         logger.error(f"Error fetching METAR data: {str(e)}")
         return {}
@@ -332,26 +361,39 @@ def get_flight_category(metar_data):
         cloud_layers = metar_data.get('cloud_layers', [])
         
         if visibility is None:
-            return None
+            return 'Unknown'
             
         # Find the lowest ceiling
-        ceiling = None
+        ceiling = float('inf')
+        has_ceiling = False
         for layer in cloud_layers:
             if layer.get('cover') in ['BKN', 'OVC']:
                 base = layer.get('base')
-                if base is not None and (ceiling is None or base < ceiling):
-                    ceiling = base
+                if base is not None:
+                    has_ceiling = True
+                    if base < ceiling:
+                        ceiling = base
         
         # Determine flight category based on visibility and ceiling
-        if visibility < 1 or (ceiling is not None and ceiling < 500):
-            return 'LIFR'  # Low IFR
-        elif visibility < 3 or (ceiling is not None and ceiling < 1000):
-            return 'IFR'   # IFR
-        elif visibility < 5 or (ceiling is not None and ceiling < 3000):
-            return 'MVFR'  # Marginal VFR
+        if not has_ceiling: # Clear skies
+             if visibility >= 5:
+                return 'VFR'
+             elif visibility >= 3:
+                return 'MVFR'
+             elif visibility >= 1:
+                return 'IFR'
+             else:
+                return 'LIFR'
+
+        if visibility < 1 or ceiling < 500:
+            return 'LIFR'
+        elif visibility < 3 or ceiling < 1000:
+            return 'IFR'
+        elif visibility < 5 or ceiling < 3000:
+            return 'MVFR'
         else:
-            return 'VFR'   # VFR
+            return 'VFR'
             
     except Exception as e:
         logger.error(f"Error determining flight category: {str(e)}")
-        return None
+        return 'Unknown'
