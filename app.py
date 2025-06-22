@@ -271,6 +271,7 @@ def get_weather():
         
         # Combine the data
         combined_data = {
+            'current': meteo_data.get('current_weather'),
             'daily': {
                 'time': daily_dates,
                 'weathercode': meteo_data['daily']['weathercode'],
@@ -289,6 +290,18 @@ def get_weather():
             }
         }
         
+        # Add current weather units to the response
+        if 'current_weather' in meteo_data:
+            combined_data['current']['wind_speed_unit'] = meteo_data.get('current_weather_units', {}).get('windspeed')
+            combined_data['current']['wind_dir_unit'] = meteo_data.get('current_weather_units', {}).get('winddirection')
+            # Convert current wind speed from m/s to knots
+            if 'windspeed' in combined_data['current'] and combined_data['current']['wind_speed_unit'] != 'kn':
+                combined_data['current']['wind_speed_kt'] = combined_data['current']['windspeed'] * 1.94384
+            else:
+                combined_data['current']['wind_speed_kt'] = combined_data['current'].get('windspeed')
+            
+            combined_data['current']['wind_dir_degrees'] = combined_data['current'].get('winddirection')
+
         # Log processed data
         app.logger.info(f'Processed weather data: {combined_data}')
         

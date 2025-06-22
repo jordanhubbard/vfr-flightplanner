@@ -1129,11 +1129,12 @@ async function fetchAirports(lat, lon) {
             radius: 50  // 50km radius
         };
         
-        const response = await fetch(`/api/airports?lat=${lat}&lon=${lon}&radius=${requestBody.radius}`, {
-            method: 'GET',
+        const response = await fetch(`/api/airports`, {
+            method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-            }
+            },
+            body: JSON.stringify(requestBody)
         });
         
         if (!response.ok) {

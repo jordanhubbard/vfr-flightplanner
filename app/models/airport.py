@@ -37,7 +37,7 @@ def calculate_distance(lat1, lon1, lat2, lon2):
 
 def get_airports(lat, lon, radius=50):
     """
-    Get airports within a specified radius of a location using OpenAIP or cached data as fallback.
+    Get airports within a specified radius of a location using cached data.
     Args:
         lat (float): Latitude
         lon (float): Longitude
@@ -54,86 +54,11 @@ def get_airports(lat, lon, radius=50):
         logger.error(f"Invalid input parameters: lat={lat}, lon={lon}, radius={radius}, error={e}")
         return {'count': 0, 'airports': []}
     
-    # Try OpenAIP API first if API key is available
-    if OPENAIP_API_KEY:
-        try:
-            radius_km = max(16, min(160, int(radius * 1.60934)))  # Convert miles to km, clamp to reasonable values
-            logger.info(f"Starting OpenAIP airport data download for lat={lat}, lon={lon}, radius={radius}nm ({radius_km}km)")
-            params = {
-                'latitude': lat,
-                'longitude': lon,
-                'radius': radius_km,
-                'apiKey': OPENAIP_API_KEY
-            }
-                
-            response = requests.get(OPENAIP_API_URL, headers=HEADERS, params=params, timeout=10)
-            response.raise_for_status()
-            data = response.json()
-            logger.info(f"OpenAIP API response keys: {list(data.keys()) if isinstance(data, dict) else 'Not a dict'}")
-            
-            airports = []
-            # OpenAIP API returns airports in 'items' key
-            for airport in data.get('items', []):
-                try:
-                    # Safely extract coordinates
-                    latitude = None
-                    longitude = None
-                    
-                    if airport.get('geometry') and airport['geometry'].get('coordinates'):
-                        coords = airport['geometry']['coordinates']
-                        if isinstance(coords, list) and len(coords) >= 2:
-                            longitude, latitude = coords[0], coords[1]
-                    
-                    if latitude is None:
-                        latitude = airport.get('lat')
-                    if longitude is None:
-                        longitude = airport.get('lon')
-                    
-                    # Skip if we don't have valid coordinates
-                    if latitude is None or longitude is None:
-                        logger.warning(f"Skipping airport {airport.get('name', 'unknown')} - missing coordinates")
-                        continue
-                    
-                    airport_data = {
-                        'icao': airport.get('icaoCode') or airport.get('icao'),
-                        'iata': airport.get('iataCode') or airport.get('iata'),
-                        'name': airport.get('name'),
-                        'city': airport.get('city'),
-                        'country': airport.get('country', {}).get('name') if isinstance(airport.get('country'), dict) else airport.get('country'),
-                        'latitude': latitude,
-                        'longitude': longitude,
-                        'elevation': airport.get('elevation'),
-                        'type': airport.get('type'),
-                        'distance': airport.get('distance', None),
-                    }
-                    
-                    # Optionally, get METAR data if needed
-                    icao = airport.get('icao')
-                    if icao:
-                        metar_data = get_metar_data([icao])
-                        if icao in metar_data:
-                            airport_data['metar'] = metar_data[icao]
-                    airports.append(airport_data)
-                    
-                except Exception as e:
-                    logger.warning(f"Error processing airport {airport.get('name', 'unknown')}: {e}")
-                    continue
-            
-            # Sort by distance, handling None values properly
-            airports.sort(key=lambda x: x.get('distance') if x.get('distance') is not None else float('inf'))
-            logger.info(f"Completed OpenAIP airport data download: found {len(airports)} airports.")
-            return {
-                'count': len(airports),
-                'airports': airports
-            }
-        except Exception as e:
-            logger.error(f"Error fetching airport data from OpenAIP: {str(e)}")
-            logger.info("Falling back to cached airport data")
-    
-    # Fallback to cached airport data
+    # Use cached airport data
     try:
         airports_cache = load_airport_cache()
         nearby_airports = []
+        icao_codes_to_fetch = []
         
         for airport in airports_cache:
             # Handle coordinate field variations
@@ -174,11 +99,16 @@ def get_airports(lat, lon, radius=50):
                     
                     # Get METAR data if ICAO is available
                     if icao_code:
-                        metar_data = get_metar_data([icao_code])
-                        if icao_code in metar_data:
-                            airport_data['weather'] = metar_data[icao_code]
+                        icao_codes_to_fetch.append(icao_code)
                     
                     nearby_airports.append(airport_data)
+
+        # Fetch METAR data for all found airports in one call
+        if icao_codes_to_fetch:
+            metar_data = get_metar_data(icao_codes_to_fetch)
+            for airport in nearby_airports:
+                if airport['icao'] in metar_data:
+                    airport['weather'] = metar_data[airport['icao']]
         
         # Sort by distance
         nearby_airports.sort(key=lambda x: x.get('distance', float('inf')))

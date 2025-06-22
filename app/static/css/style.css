@@ -1573,10 +1573,10 @@ input[type="range"] {
     cursor: pointer;
 }
 
-.vertical-slider::-webkit-slider-track {
+.vertical-slider::-webkit-slider-runnable-track {
     width: 4px;
     height: 100px;
-    background: #ddd;
+    background: #dee2e6;
     border-radius: 2px;
 }
 
@@ -1588,7 +1588,7 @@ input[type="range"] {
     background: #007bff;
     border-radius: 50%;
     cursor: pointer;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    margin-top: -6px; /* Center thumb on track */
 }
 
 .vertical-slider::-moz-range-track {

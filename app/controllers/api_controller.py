@@ -102,19 +102,30 @@ def get_weather():
             'message': 'Weather service temporarily unavailable'
         }), 500
 
-@api_bp.route('/airports', methods=['GET'])
+@api_bp.route('/airports', methods=['POST'])
 def airports():
     """Get airports within a radius of a location"""
     try:
-        lat = request.args.get('lat', type=float)
-        lon = request.args.get('lon', type=float)
-        radius = request.args.get('radius', default=50, type=int)
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': 'No JSON data provided'}), 400
         
-        if not all([lat, lon]):
+        lat = data.get('lat')
+        lon = data.get('lon')
+        radius = data.get('radius', 50)
+        
+        if lat is None or lon is None:
             return jsonify({
                 'error': 'Missing parameters',
                 'message': 'Latitude and longitude are required'
             }), 400
+        
+        try:
+            lat = float(lat)
+            lon = float(lon)
+            radius = int(radius)
+        except (ValueError, TypeError):
+            return jsonify({'error': 'Invalid data type for lat, lon, or radius'}), 400
             
         # Get airports from the airport model
         airports_data = get_airports(lat, lon, radius)

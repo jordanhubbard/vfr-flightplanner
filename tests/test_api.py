@@ -180,3 +180,14 @@ def test_airport_endpoint(client):
         mock_airport.return_value = None
         response = client.get('/api/airport?code=INVALID')
         assert response.status_code == 404
+
+def test_get_airports_post(client):
+    """Test the /api/airports endpoint with a POST request."""
+    response = client.post('/api/airports',
+                             json={'lat': 37.7749, 'lon': -122.4194, 'radius': 25})
+    assert response.status_code == 200
+    data = response.get_json()
+    assert 'airports' in data
+    assert isinstance(data['airports'], list)
+    assert 'count' in data
+    assert isinstance(data['count'], int)
