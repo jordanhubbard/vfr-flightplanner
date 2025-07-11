@@ -1,17 +1,49 @@
-Flask==3.0.2
-requests==2.31.0
+# FastAPI and core dependencies
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+pydantic==2.5.0
+pydantic-settings==2.1.0
+
+# HTTP client and async operations
+httpx==0.25.2
+aiofiles==23.2.1
+
+# Database and ORM (for future use)
+sqlalchemy==2.0.23
+alembic==1.13.1
+
+# Authentication and security
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+python-multipart==0.0.6
+
+# Middleware and security
+fastapi-limiter==0.1.5
+slowapi==0.1.9
+
+# Environment and configuration
 python-dotenv==1.0.1
-gunicorn==21.2.0
-watchdog==4.0.0
+
+# Caching and performance
+redis==5.0.1
+aiocache==0.12.2
+
+# Logging and monitoring
+structlog==23.2.0
 
 # Testing tools
 pytest==7.4.0
+pytest-asyncio==0.21.1
 pytest-cov==4.1.0
-selenium==4.15.0
+pytest-mock==3.12.0
 
-# Linting tools
+# Development tools
+black==23.11.0
+isort==5.12.0
 flake8==7.0.0
-autopep8==2.0.4
+mypy==1.7.1
 
-# API extensions
-flask-cors==4.0.0
+# Legacy dependencies (keeping for compatibility during migration)
+requests==2.31.0
+gunicorn==21.2.0
+watchdog==4.0.0

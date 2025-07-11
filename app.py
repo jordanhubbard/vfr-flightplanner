@@ -1,41 +1,47 @@
-from dotenv import load_dotenv
-import os
+"""
+VFR Flight Planner - Main Entry Point.
 
-# Load .env from the same directory as app.py
+FastAPI application for VFR flight planning with weather integration.
+"""
+
+import os
+import logging
+from dotenv import load_dotenv
+
+# Load environment variables
 load_dotenv(os.path.join(os.path.dirname(__file__), '.env'))
 
-# Use the app factory pattern
+# Import FastAPI app factory
 from app import create_app
-from app.config import DevelopmentConfig
+from app.config import settings
 
-app = create_app(DevelopmentConfig)
+# Configure logging
+logging.basicConfig(
+    level=getattr(logging, settings.log_level),
+    format=settings.log_format
+)
 
-@app.after_request
-def add_header(response):
-    """Add headers for caching control."""
-    if app.debug:
-        # In debug mode, prevent caching
-        response.headers['Cache-Control'] = 'no-store'
-    else:
-        # In production, cache static files
-        if request.path.startswith('/static/'):
-            response.headers['Cache-Control'] = 'public, max-age=600'
-    return response
+logger = logging.getLogger(__name__)
 
-@app.errorhandler(404)
-def not_found_error(error):
-    """Handle 404 errors gracefully"""
-    if request.path == '/ws':
-        logger.warning("WebSocket connection attempted but not supported")
-        return jsonify({
-            "error": "WebSocket connections are not supported",
-            "message": "This endpoint only supports HTTP requests"
-        }), 404
-    return jsonify({
-        "error": "Not Found",
-        "message": f"The requested URL {request.path} was not found on the server"
-    }), 404
+# Create FastAPI application
+app = create_app(settings)
 
-if __name__ == '__main__':
-    port = int(os.getenv('PORT', 5000))
-    app.run(debug=True, use_reloader=True, host='0.0.0.0', port=port) 
+# Add static file mounting
+from fastapi.staticfiles import StaticFiles
+app.mount("/static", StaticFiles(directory="app/static"), name="static")
+
+# For development with uvicorn
+if __name__ == "__main__":
+    import uvicorn
+    
+    logger.info(f"Starting VFR Flight Planner on {settings.host}:{settings.port}")
+    logger.info(f"Debug mode: {settings.debug}")
+    logger.info(f"API documentation: http://{settings.host}:{settings.port}{settings.docs_url}")
+    
+    uvicorn.run(
+        "app:app",
+        host=settings.host,
+        port=settings.port,
+        reload=settings.reload,
+        log_level=settings.log_level.lower()
+    ) 

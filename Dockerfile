@@ -5,8 +5,9 @@ WORKDIR /app
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PORT=8080 \
-    FLASK_ENV=production
+    PORT=8000 \
+    ENVIRONMENT=production \
+    HOST=0.0.0.0
 
 # Install system dependencies
 RUN apt-get update \
@@ -35,14 +36,18 @@ RUN chmod +x docker-entrypoint.sh
 COPY . .
 
 # Create a non-root user and switch to it
-RUN groupadd -r weatherapp && \
-    useradd -r -g weatherapp weatherapp && \
-    chown -R weatherapp:weatherapp /app
+RUN groupadd -r flightplanner && \
+    useradd -r -g flightplanner flightplanner && \
+    chown -R flightplanner:flightplanner /app
 
-USER weatherapp
+USER flightplanner
 
 # Expose the port the app runs on
 EXPOSE ${PORT}
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:${PORT}/api/health || exit 1
 
 # Use the entrypoint script
 ENTRYPOINT ["/app/docker-entrypoint.sh"]

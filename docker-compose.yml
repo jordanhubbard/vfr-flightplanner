@@ -2,22 +2,37 @@ services:
   web:
     build: .
     ports:
-      - "8080:8080"
+      - "8000:8000"
     volumes:
       - ./app:/app/app
       - ./logs:/app/logs
     environment:
-      - PORT=8080
-      - FLASK_ENV=${FLASK_ENV:-development}
+      - PORT=8000
+      - HOST=0.0.0.0
+      - ENVIRONMENT=${ENVIRONMENT:-development}
       - PYTHONPATH=/app
-      - OPENWEATHERMAP_API_KEY=${OPENWEATHERMAP_API_KEY}
-      - OPENAIP_API_KEY=${OPENAIP_API_KEY}
+      - OPENWEATHER_API_KEY=${OPENWEATHERMAP_API_KEY}
+      - OPENMETEO_BASE_URL=https://api.open-meteo.com/v1
+      - DEBUG=true
+      - LOG_LEVEL=INFO
     restart: unless-stopped
     env_file:
       - .env
     healthcheck:
-      test: ["CMD", "python3", "-c", "import requests; import sys; sys.exit(0) if requests.get('http://localhost:8080/api/health').status_code == 200 else sys.exit(1)"]
+      test: ["CMD", "python3", "-c", "import requests; import sys; sys.exit(0) if requests.get('http://localhost:8000/api/health').status_code == 200 else sys.exit(1)"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 10s
+
+  # Optional Redis service for caching (can be enabled if needed)
+  # redis:
+  #   image: redis:7-alpine
+  #   ports:
+  #     - "6379:6379"
+  #   restart: unless-stopped
+  #   healthcheck:
+  #     test: ["CMD", "redis-cli", "ping"]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 3
