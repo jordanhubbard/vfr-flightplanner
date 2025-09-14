@@ -9,7 +9,7 @@ import logging
 from datetime import datetime
 from typing import Dict, Any
 
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Request
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 
@@ -25,7 +25,7 @@ limiter = Limiter(key_func=get_remote_address)
 
 @router.get("/health", response_model=HealthResponse)
 @limiter.limit("10/minute")
-async def health_check(request) -> HealthResponse:
+async def health_check(request: Request) -> HealthResponse:
     """
     Check the health of all required external APIs and services.
     
@@ -75,7 +75,8 @@ async def health_check(request) -> HealthResponse:
         return HealthResponse(
             overall_status=overall_status,
             services=services,
-            version=settings.app_version
+            version=settings.app_version,
+            timestamp=datetime.now()
         )
         
     except Exception as e:
@@ -88,7 +89,7 @@ async def health_check(request) -> HealthResponse:
 
 @router.get("/airport-cache-status", response_model=CacheStatusResponse)
 @limiter.limit("5/minute")
-async def airport_cache_status(request) -> CacheStatusResponse:
+async def airport_cache_status(request: Request) -> CacheStatusResponse:
     """
     Get the status of the airport cache.
     
@@ -143,7 +144,7 @@ async def airport_cache_status(request) -> CacheStatusResponse:
 
 @router.post("/refresh-airport-cache", response_model=SuccessResponse)
 @limiter.limit("1/hour")
-async def refresh_airport_cache(request) -> SuccessResponse:
+async def refresh_airport_cache(request: Request) -> SuccessResponse:
     """
     Refresh the airport cache in the background.
     
@@ -208,11 +209,13 @@ async def _check_meteo_api() -> ServiceHealth:
             status=result.get('status', False),
             error=result.get('error'),
             timestamp=datetime.now(),
-            response_time_ms=response_time
+            response_time_ms=response_time,
+            api_calls=0
         )
     except Exception as e:
         return ServiceHealth(
             status=False,
             error=str(e),
-            timestamp=datetime.now()
+            timestamp=datetime.now(),
+            api_calls=0
         ) 

@@ -1,7 +1,6 @@
 import math
 import heapq
 from app.models.airport import get_airport_coordinates, get_airports, load_airport_cache
-from app.models.weather import get_weather_data
 
 # Constants for VFR altitudes (in feet)
 VFR_EAST_ODD = [3500, 5500, 7500, 9500, 11500]  # Odd thousands + 500

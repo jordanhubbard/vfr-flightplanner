@@ -8,7 +8,7 @@ import asyncio
 import logging
 from typing import Dict, Any
 
-from fastapi import APIRouter, HTTPException, Body
+from fastapi import APIRouter, HTTPException, Body, Request
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
@@ -24,13 +24,14 @@ limiter = Limiter(key_func=get_remote_address)
 @router.post("/plan_route", response_model=FlightPlanResponse)
 @limiter.limit("10/minute")
 async def plan_vfr_route(
-    request,
+    request: Request,
     flight_request: FlightPlanRequest = Body(..., description="Flight plan request")
 ) -> FlightPlanResponse:
     """
     Plan a VFR route between two airports with advanced fuel planning, terrain avoidance, and wind analysis.
     
     Args:
+        request: FastAPI request object
         flight_request: Flight planning parameters
         
     Returns:

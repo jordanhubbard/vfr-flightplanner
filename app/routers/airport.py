@@ -8,7 +8,7 @@ import asyncio
 import logging
 from typing import Dict, Any, List
 
-from fastapi import APIRouter, HTTPException, Body, Query
+from fastapi import APIRouter, HTTPException, Body, Query, Request
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
@@ -27,13 +27,14 @@ limiter = Limiter(key_func=get_remote_address)
 @router.post("/airports", response_model=AirportSearchResponse)
 @limiter.limit("20/minute")
 async def search_airports(
-    request,
+    request: Request,
     search_request: AirportSearchRequest = Body(..., description="Airport search request")
 ) -> AirportSearchResponse:
     """
     Search for airports within a radius of a location.
     
     Args:
+        request: FastAPI request object
         search_request: Airport search parameters
         
     Returns:
@@ -98,13 +99,14 @@ async def search_airports(
 @router.get("/airport", response_model=AirportResponse)
 @limiter.limit("30/minute")
 async def get_airport_info(
-    request,
+    request: Request,
     code: str = Query(..., description="Airport ICAO or IATA code", min_length=3, max_length=4)
 ) -> AirportResponse:
     """
     Get airport information by ICAO or IATA code.
     
     Args:
+        request: FastAPI request object
         code: Airport ICAO or IATA code
         
     Returns:
@@ -144,13 +146,14 @@ async def get_airport_info(
 @router.get("/metar", response_model=MetarResponse)
 @limiter.limit("20/minute")
 async def get_metar_weather(
-    request,
+    request: Request,
     codes: str = Query(..., description="Comma-separated list of ICAO airport codes")
 ) -> MetarResponse:
     """
     Get METAR weather data for airports.
     
     Args:
+        request: FastAPI request object
         codes: Comma-separated list of ICAO airport codes
         
     Returns:

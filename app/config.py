@@ -4,7 +4,8 @@ FastAPI Application Configuration using Pydantic Settings.
 
 import os
 from typing import Optional, List
-from pydantic import BaseSettings, Field
+from pydantic import Field
+from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
@@ -63,13 +64,6 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         case_sensitive = False
-        
-        @classmethod
-        def parse_env_var(cls, field_name: str, raw_val: str) -> any:
-            """Parse environment variables, particularly for lists."""
-            if field_name in ('cors_origins', 'cors_methods', 'cors_headers'):
-                return [x.strip() for x in raw_val.split(',')]
-            return cls.json_loads(raw_val)
 
 
 class DevelopmentSettings(Settings):

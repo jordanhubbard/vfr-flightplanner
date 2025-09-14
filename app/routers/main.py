@@ -7,7 +7,6 @@ Provides endpoints for the web interface and static file serving.
 import logging
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, FileResponse
-from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 logger = logging.getLogger(__name__)

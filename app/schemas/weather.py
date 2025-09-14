@@ -3,8 +3,8 @@ Weather API Pydantic schemas.
 """
 
 from typing import List, Optional, Dict, Any
-from pydantic import BaseModel, Field
-from datetime import datetime
+from pydantic import BaseModel, Field, ConfigDict
+from datetime import datetime as dt
 from .common import Coordinates
 
 
@@ -28,7 +28,7 @@ class WeatherRequest(BaseModel):
 
 class WeatherData(BaseModel):
     """Single weather data point."""
-    datetime: datetime = Field(..., description="Forecast timestamp")
+    datetime: dt = Field(..., description="Forecast timestamp")
     temperature: float = Field(..., description="Temperature in Celsius")
     humidity: int = Field(..., ge=0, le=100, description="Humidity percentage")
     wind_speed: float = Field(..., ge=0, description="Wind speed in m/s")

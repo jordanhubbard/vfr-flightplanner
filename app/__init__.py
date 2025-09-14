@@ -12,6 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
+from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
@@ -102,6 +103,9 @@ def create_app(settings: Settings) -> FastAPI:
         },
     )
     
+    # Mount static files
+    app.mount("/static", StaticFiles(directory="app/static"), name="static")
+    
     # Add rate limiting
     app.state.limiter = limiter
     app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
@@ -180,7 +184,7 @@ def add_exception_handlers(app: FastAPI) -> None:
                 error="ValidationError",
                 message="Invalid request data",
                 details={"errors": exc.errors()}
-            ).dict(),
+            ).model_dump(mode='json'),
         )
     
     @app.exception_handler(StarletteHTTPException)
@@ -192,7 +196,7 @@ def add_exception_handlers(app: FastAPI) -> None:
                 error="HTTPException",
                 message=exc.detail,
                 details={"status_code": exc.status_code}
-            ).dict(),
+            ).model_dump(mode='json'),
         )
     
     @app.exception_handler(Exception)
@@ -205,14 +209,14 @@ def add_exception_handlers(app: FastAPI) -> None:
                 error="InternalServerError",
                 message="An unexpected error occurred",
                 details={"type": type(exc).__name__}
-            ).dict(),
+            ).model_dump(mode='json'),
         )
 
 
 def register_routers(app: FastAPI, settings: Settings) -> None:
     """Register API routers."""
     
-    # Import routers (will be created next)
+    # Import routers
     from app.routers import health, weather, airport, flight_plan, main
     
     # Register API routers with prefix
@@ -223,10 +227,132 @@ def register_routers(app: FastAPI, settings: Settings) -> None:
     
     # Register main router (for web interface)
     app.include_router(main.router, tags=["main"])
+    
+    # Add React frontend serving
+    add_react_routes(app, settings)
 
 
-# For compatibility during migration
-def create_app_legacy(config_class=None):
-    """Legacy function for backward compatibility."""
-    from app.config import settings
-    return create_app(settings)
+def add_react_routes(app: FastAPI, settings: Settings) -> None:
+    """Add routes for serving React frontend."""
+    from pathlib import Path
+    from fastapi.responses import HTMLResponse, RedirectResponse
+    from fastapi.staticfiles import StaticFiles
+    import os
+    
+    # Mount static files for React build
+    static_path = Path(__file__).parent / "static"
+    static_path.mkdir(exist_ok=True)
+    
+    # Mount the frontend dist directory
+    frontend_dist = Path(__file__).parent.parent / "frontend" / "dist"
+    if frontend_dist.exists():
+        app.mount("/assets", StaticFiles(directory=str(frontend_dist / "assets")), name="assets")
+        
+        # Serve React app for all non-API routes
+        @app.get("/", response_class=HTMLResponse)
+        async def serve_react_app():
+            """Serve the React application."""
+            # In development mode, return API info instead of serving React
+            if os.environ.get('ENVIRONMENT') == 'development':
+                return HTMLResponse(content=f"""
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <title>VFR Flight Planner API - Development Mode</title>
+                    <style>
+                        body {{ font-family: Arial, sans-serif; margin: 40px; background: #f5f5f5; }}
+                        .container {{ background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }}
+                        .api-link {{ display: inline-block; margin: 10px 0; padding: 10px 15px; background: #007bff; color: white; text-decoration: none; border-radius: 4px; }}
+                        .api-link:hover {{ background: #0056b3; }}
+                        .dev-info {{ background: #e7f3ff; padding: 15px; border-radius: 4px; margin: 20px 0; }}
+                    </style>
+                </head>
+                <body>
+                    <div class="container">
+                        <h1>✈️ VFR Flight Planner API</h1>
+                        <div class="dev-info">
+                            <strong>Development Mode Active</strong><br>
+                            FastAPI backend running on port 8080
+                        </div>
+                        <h2>API Documentation</h2>
+                        <a href="/api/docs" class="api-link">📚 Interactive API Docs (Swagger)</a><br>
+                        <a href="/api/redoc" class="api-link">📖 ReDoc Documentation</a><br>
+                        <a href="/api/health" class="api-link">❤️ Health Check</a>
+                        
+                        <h2>Quick Test</h2>
+                        <p>Get weather: <code>GET /api/weather/KPAO</code></p>
+                        <p>Search airports: <code>GET /api/airports/search?q=palo+alto</code></p>
+                    </div>
+                </body>
+                </html>
+                """)
+            
+            # Production mode: serve built React app
+            try:
+                index_file = frontend_dist / "index.html"
+                if index_file.exists():
+                    with open(index_file, 'r', encoding='utf-8') as f:
+                        content = f.read()
+                    return HTMLResponse(content=content)
+                else:
+                    return HTMLResponse(content=f"""
+                    <!DOCTYPE html>
+                    <html>
+                    <head>
+                        <title>VFR Flight Planner</title>
+                    </head>
+                    <body>
+                        <h1>VFR Flight Planner</h1>
+                        <p>React build not found at: <code>{index_file}</code></p>
+                        <p>Please build the frontend:</p>
+                        <pre>cd frontend && npm run build</pre>
+                    </body>
+                    </html>
+                    """)
+            except Exception as e:
+                return HTMLResponse(content=f"<h1>Error serving frontend: {e}</h1>", status_code=500)
+        
+        # API Documentation routes
+        @app.get("/docs", response_class=HTMLResponse)
+        async def api_docs_redirect():
+            """Redirect to API documentation."""
+            return RedirectResponse(url="/api/docs", status_code=302)
+
+        @app.get("/api-docs", response_class=HTMLResponse) 
+        async def api_docs_alt():
+            """Alternative API documentation endpoint."""
+            return RedirectResponse(url="/api/docs", status_code=302)
+        
+        # Catch-all route for React SPA (must be last!)
+        @app.get("/{path:path}", response_class=HTMLResponse)
+        async def serve_spa(path: str):
+            """Serve React SPA for all routes (client-side routing)."""
+            # Don't serve SPA for API routes - let them return proper 404
+            if path.startswith("api/"):
+                from fastapi import HTTPException
+                raise HTTPException(status_code=404, detail="API endpoint not found")
+            
+            return await serve_react_app()
+    else:
+        # No React build found - serve basic info page
+        @app.get("/", response_class=HTMLResponse)
+        async def serve_basic_info():
+            return HTMLResponse(content="""
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>VFR Flight Planner API</title>
+            </head>
+            <body>
+                <h1>VFR Flight Planner API</h1>
+                <p>Frontend not built. Build with: <code>cd frontend && npm run build</code></p>
+                <p><a href="/api/docs">API Documentation</a></p>
+            </body>
+            </html>
+            """)
+
+
+# Create the application instance
+from app.config import settings
+
+app = create_app(settings)
