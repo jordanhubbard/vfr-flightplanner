@@ -217,13 +217,14 @@ def register_routers(app: FastAPI, settings: Settings) -> None:
     """Register API routers."""
     
     # Import routers
-    from app.routers import health, weather, airport, flight_plan, main
+    from app.routers import health, weather, airport, flight_plan, main, route_weather
     
     # Register API routers with prefix
     app.include_router(health.router, prefix=settings.api_prefix, tags=["health"])
     app.include_router(weather.router, prefix=settings.api_prefix, tags=["weather"])
     app.include_router(airport.router, prefix=settings.api_prefix, tags=["airport"])
     app.include_router(flight_plan.router, prefix=settings.api_prefix, tags=["flight-plan"])
+    app.include_router(route_weather.router, prefix=settings.api_prefix, tags=["route-weather"])
     
     # Register main router (for web interface)
     app.include_router(main.router, tags=["main"])

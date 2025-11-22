@@ -678,12 +678,25 @@ flightPlanForm.addEventListener('submit', async function(e) {
         flightLegsContainer.style.display = 'block';
         displayFlightLegsTable(data, fuelCapacity, fuelBurnRate);
         
-        // Fetch weather data along the route
-        const routeWeatherData = await fetchRouteWeatherData(legs, cruisingAltitude);
-        console.log('Route weather data:', routeWeatherData);
+        // Fetch comprehensive route weather summary
+        const routeWeatherSummary = await fetchRouteWeatherSummary(routeCoords, cruisingAltitude);
+        console.log('Route weather summary:', routeWeatherSummary);
         
         // Display route weather information in the flight legs table
-        displayFlightLegsTable(data, fuelCapacity, fuelBurnRate, routeWeatherData);
+        displayFlightLegsTable(data, fuelCapacity, fuelBurnRate, routeWeatherSummary);
+        
+        // Display overall route weather summary
+        if (routeWeatherSummary && routeWeatherSummary.summary) {
+            displayRouteWeatherSummary(routeWeatherSummary.summary);
+        }
+        
+        // Add weather markers along the route
+        if (routeWeatherSummary && routeWeatherSummary.waypoint_weather) {
+            addRouteWeatherMarkers(routeWeatherSummary.waypoint_weather);
+        }
+        
+        // Make the route polyline clickable for detailed weather
+        makeRouteClickable(routePolyline, cruisingAltitude);
         
         ToastManager.success(`Flight route planned successfully from ${from} to ${to}`);
     } catch (error) {
@@ -1542,73 +1555,289 @@ function updateSelectedLocation(lat, lon) {
     }
 }
 
-// Function to fetch weather data along a flight route
-async function fetchRouteWeatherData(routeLegs, cruisingAltitude = 6500) {
-    const weatherData = [];
+// Function to fetch comprehensive route weather summary using new API
+async function fetchRouteWeatherSummary(routeCoords, cruisingAltitude = 6500) {
+    try {
+        // Convert route coordinates to waypoints format
+        const waypoints = routeCoords.map(coord => ({
+            lat: coord[0],
+            lon: coord[1]
+        }));
+        
+        ToastManager.info('Fetching route weather analysis...');
+        
+        const response = await fetch('/api/route_weather_summary', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                waypoints: waypoints,
+                interval_nm: 20,
+                altitude_ft: cruisingAltitude
+            })
+        });
+        
+        if (!response.ok) {
+            throw new Error('Failed to fetch route weather summary');
+        }
+        
+        const weatherSummary = await response.json();
+        ToastManager.success('Route weather analysis complete');
+        return weatherSummary;
+        
+    } catch (error) {
+        console.error('Error fetching route weather summary:', error);
+        ToastManager.warning('Could not fetch complete route weather analysis');
+        return null;
+    }
+}
+
+// Function to display route weather summary in UI
+function displayRouteWeatherSummary(summary) {
+    const summaryContainer = document.getElementById('route-summary');
+    if (!summaryContainer) return;
     
-    for (const leg of routeLegs) {
+    const summaryHtml = `
+        <div class="route-weather-summary">
+            <h3>Route Weather Summary</h3>
+            <div class="weather-summary-grid">
+                <div class="weather-stat">
+                    <div class="stat-label">Overall Conditions</div>
+                    <div class="stat-value ${summary.overall_conditions.toLowerCase()}">${summary.overall_conditions}</div>
+                </div>
+                <div class="weather-stat">
+                    <div class="stat-label">Average Wind</div>
+                    <div class="stat-value">${summary.avg_wind_speed_kt} kt</div>
+                </div>
+                <div class="weather-stat">
+                    <div class="stat-label">Max Wind</div>
+                    <div class="stat-value">${summary.max_wind_speed_kt} kt</div>
+                </div>
+                <div class="weather-stat">
+                    <div class="stat-label">Min Visibility</div>
+                    <div class="stat-value">${summary.min_visibility_sm} sm</div>
+                </div>
+                <div class="weather-stat">
+                    <div class="stat-label">Avg Cloud Cover</div>
+                    <div class="stat-value">${summary.avg_cloud_cover_percent}%</div>
+                </div>
+                <div class="weather-stat">
+                    <div class="stat-label">Precip Chance</div>
+                    <div class="stat-value">${summary.max_precipitation_probability}%</div>
+                </div>
+            </div>
+            <div class="significant-weather">
+                <strong>Significant Weather:</strong>
+                <ul>
+                    ${summary.significant_weather.map(wx => `<li>${wx}</li>`).join('')}
+                </ul>
+            </div>
+        </div>
+    `;
+    
+    // Insert after the route stats
+    const existingWeatherSummary = summaryContainer.querySelector('.route-weather-summary');
+    if (existingWeatherSummary) {
+        existingWeatherSummary.remove();
+    }
+    summaryContainer.insertAdjacentHTML('beforeend', summaryHtml);
+}
+
+// Array to store route weather markers
+let routeWeatherMarkers = [];
+
+// Function to add weather markers along the route
+function addRouteWeatherMarkers(waypointWeather) {
+    // Clear existing weather markers
+    routeWeatherMarkers.forEach(marker => map.removeLayer(marker));
+    routeWeatherMarkers = [];
+    
+    if (!waypointWeather || waypointWeather.length === 0) return;
+    
+    // Sample every 3rd waypoint to avoid clutter (approximately every 60nm)
+    const sampledWaypoints = waypointWeather.filter((_, index) => index % 3 === 0);
+    
+    sampledWaypoints.forEach((wp, index) => {
+        const flightCategory = determineFlightCategory(wp.visibility_sm, wp.cloud_cover_percent);
+        const color = getFlightCategoryColor(flightCategory);
+        
+        // Create a small weather marker
+        const marker = L.circleMarker([wp.lat, wp.lon], {
+            radius: 6,
+            fillColor: color,
+            color: '#fff',
+            weight: 2,
+            opacity: 1,
+            fillOpacity: 0.8
+        });
+        
+        // Create tooltip with basic info
+        const tooltipContent = `
+            <div style="font-size: 11px;">
+                <strong>Weather @ ${wp.distance_from_start}nm</strong><br>
+                ${flightCategory}<br>
+                Wind: ${wp.wind_direction_deg}° @ ${wp.wind_speed_kt}kt<br>
+                Vis: ${wp.visibility_sm}sm<br>
+                Click route for details
+            </div>
+        `;
+        
+        marker.bindTooltip(tooltipContent, {
+            permanent: false,
+            direction: 'top',
+            className: 'route-weather-tooltip'
+        });
+        
+        marker.addTo(map);
+        routeWeatherMarkers.push(marker);
+    });
+}
+
+// Helper function to determine flight category
+function determineFlightCategory(visibility_sm, cloud_cover_percent) {
+    if (visibility_sm >= 5 && cloud_cover_percent < 50) {
+        return 'VFR';
+    } else if (visibility_sm >= 3 && cloud_cover_percent < 75) {
+        return 'MVFR';
+    } else if (visibility_sm >= 1) {
+        return 'IFR';
+    } else {
+        return 'LIFR';
+    }
+}
+
+// Function to make route polyline clickable for detailed weather
+function makeRouteClickable(polyline, cruisingAltitude) {
+    if (!polyline) return;
+    
+    polyline.on('click', async function(e) {
+        const lat = e.latlng.lat;
+        const lon = e.latlng.lng;
+        
+        ToastManager.info('Fetching detailed weather...');
+        
         try {
-            // Fetch weather for departure airport
-            const depResponse = await fetch(`/api/airport?code=${leg.from}`);
-            const depAirport = await depResponse.json();
+            // Fetch detailed weather for the clicked point
+            const response = await fetch('/api/point_weather_detail', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    lat: lat,
+                    lon: lon,
+                    altitude_ft: cruisingAltitude
+                })
+            });
             
-            if (depResponse.ok) {
-                const depWeather = await fetchWeatherData(depAirport.latitude, depAirport.longitude, 1);
-                if (depWeather) {
-                    weatherData.push({
-                        airport: leg.from,
-                        name: depAirport.name,
-                        lat: depAirport.latitude,
-                        lon: depAirport.longitude,
-                        weather: depWeather,
-                        type: 'departure'
-                    });
-                }
+            if (!response.ok) {
+                throw new Error('Failed to fetch detailed weather');
             }
             
-            // Fetch weather for arrival airport
-            const arrResponse = await fetch(`/api/airport?code=${leg.to}`);
-            const arrAirport = await arrResponse.json();
+            const detailedWeather = await response.json();
             
-            if (arrResponse.ok) {
-                const arrWeather = await fetchWeatherData(arrAirport.latitude, arrAirport.longitude, 1);
-                if (arrWeather) {
-                    weatherData.push({
-                        airport: leg.to,
-                        name: arrAirport.name,
-                        lat: arrAirport.latitude,
-                        lon: arrAirport.longitude,
-                        weather: arrWeather,
-                        type: 'arrival'
-                    });
-                }
-            }
+            // Display detailed weather in a popup
+            displayDetailedWeatherPopup(lat, lon, detailedWeather);
             
-            // Fetch weather at 20nm intervals along the leg (for future enhancement)
-            const numIntervals = Math.max(1, Math.floor(leg.distance_nm / 20));
-            for (let i = 1; i < numIntervals; i++) {
-                const fraction = i / numIntervals;
-                const intermediateLat = depAirport.latitude + (arrAirport.latitude - depAirport.latitude) * fraction;
-                const intermediateLon = depAirport.longitude + (arrAirport.longitude - depAirport.longitude) * fraction;
-                
-                const intermediateWeather = await fetchWeatherData(intermediateLat, intermediateLon, 1);
-                if (intermediateWeather) {
-                    weatherData.push({
-                        airport: `${leg.from}-${leg.to}-${i}`,
-                        name: `Waypoint ${i}`,
-                        lat: intermediateLat,
-                        lon: intermediateLon,
-                        weather: intermediateWeather,
-                        type: 'waypoint',
-                        distance_from_departure: leg.distance_nm * fraction
-                    });
-                }
-            }
+            ToastManager.success('Detailed weather loaded');
             
         } catch (error) {
-            console.error(`Error fetching weather for leg ${leg.from} to ${leg.to}:`, error);
+            console.error('Error fetching detailed weather:', error);
+            ToastManager.error('Failed to fetch detailed weather');
         }
+    });
+    
+    // Change cursor on hover to indicate it's clickable
+    polyline.on('mouseover', function() {
+        map.getContainer().style.cursor = 'pointer';
+    });
+    
+    polyline.on('mouseout', function() {
+        map.getContainer().style.cursor = '';
+    });
+}
+
+// Function to display detailed weather popup
+function displayDetailedWeatherPopup(lat, lon, weatherData) {
+    const current = weatherData.current_conditions;
+    const hourly = weatherData.hourly_forecast;
+    const winds = weatherData.winds_aloft;
+    const clouds = weatherData.cloud_layers;
+    
+    // Build popup content with detailed aviation weather
+    let popupContent = `
+        <div class="detailed-weather-popup">
+            <h3>Detailed Weather</h3>
+            <div class="weather-location">
+                ${lat.toFixed(4)}°, ${lon.toFixed(4)}°
+            </div>
+            
+            <div class="current-conditions">
+                <h4>Current Conditions</h4>
+                <p><strong>${current.weather_description}</strong></p>
+                <div class="weather-grid">
+                    <div>Temp: ${current.temperature_c}°C (${current.temperature_f}°F)</div>
+                    <div>Wind: ${current.wind_direction_deg}° @ ${current.wind_speed_kt}kt</div>
+                </div>
+            </div>
+    `;
+    
+    // Add winds aloft if available
+    if (winds && winds.length > 0) {
+        popupContent += `
+            <div class="winds-aloft">
+                <h4>Winds Aloft</h4>
+                <div class="winds-grid">
+                    ${winds.map(w => `
+                        <div>${w.altitude_ft}ft: ${w.wind_direction_deg}° @ ${w.wind_speed_kt}kt</div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
     }
     
-    return weatherData;
+    // Add cloud layers if available
+    if (clouds && clouds.length > 0) {
+        popupContent += `
+            <div class="cloud-layers">
+                <h4>Cloud Layers</h4>
+                ${clouds.map(c => `
+                    <div>${c.level}: ${c.coverage_percent}% @ ${c.base_ft}ft</div>
+                `).join('')}
+            </div>
+        `;
+    }
+    
+    // Add hourly forecast (next 6 hours)
+    if (hourly && hourly.length > 0) {
+        const next6Hours = hourly.slice(0, 6);
+        popupContent += `
+            <div class="hourly-forecast">
+                <h4>Next 6 Hours</h4>
+                <div class="forecast-grid-compact">
+                    ${next6Hours.map(h => {
+                        if (!h.time) return '';
+                        const time = new Date(h.time * 1000);
+                        return `
+                            <div class="forecast-hour">
+                                <div class="hour-time">${time.getHours().toString().padStart(2, '0')}:00</div>
+                                <div class="hour-temp">${h.temperature_c}°C</div>
+                                <div class="hour-wind">${h.wind_direction_deg}°/${h.wind_speed_kt}kt</div>
+                                <div class="hour-vis">${h.visibility_sm}sm</div>
+                                <div class="hour-clouds">${h.cloud_cover_percent}%</div>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            </div>
+        `;
+    }
+    
+    popupContent += `</div>`;
+    
+    // Create or update popup
+    L.popup({
+        maxWidth: 400,
+        className: 'detailed-weather-popup-container'
+    })
+    .setLatLng([lat, lon])
+    .setContent(popupContent)
+    .openOn(map);
 }
