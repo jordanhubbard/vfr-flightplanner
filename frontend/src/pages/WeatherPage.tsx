@@ -141,56 +141,56 @@ const WeatherPage: React.FC = () => {
             <ResultsSection title={`Current Weather - ${weatherData.airport}`}>
               <Card sx={{ mb: 2 }}>
                 <CardContent>
-                  <Box variant="h6" component="div" gutterBottom>
+                  <Typography variant="h6" gutterBottom>
                     {weatherData.conditions}
-                  </Box>
+                  </Typography>
                   
                   <Grid container spacing={2}>
                     <Grid item xs={6}>
                       <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
                         <Thermostat sx={{ mr: 1, color: 'primary.main' }} />
-                        <Box component="span" variant="body1">
+                        <Typography variant="body1">
                           {weatherData.temperature}°F
-                        </Box>
+                        </Typography>
                       </Box>
                     </Grid>
                     
                     <Grid item xs={6}>
                       <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
                         <Air sx={{ mr: 1, color: 'primary.main' }} />
-                        <Box component="span" variant="body1">
+                        <Typography variant="body1">
                           {weatherData.wind_direction}° @ {weatherData.wind_speed} kts
-                        </Box>
+                        </Typography>
                       </Box>
                     </Grid>
                     
                     <Grid item xs={6}>
                       <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
                         <Visibility sx={{ mr: 1, color: 'primary.main' }} />
-                        <Box component="span" variant="body1">
+                        <Typography variant="body1">
                           {weatherData.visibility} SM
-                        </Box>
+                        </Typography>
                       </Box>
                     </Grid>
                     
                     <Grid item xs={6}>
                       <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
                         <Cloud sx={{ mr: 1, color: 'primary.main' }} />
-                        <Box component="span" variant="body1">
+                        <Typography variant="body1">
                           {weatherData.ceiling} ft
-                        </Box>
+                        </Typography>
                       </Box>
                     </Grid>
                   </Grid>
                   
                   {weatherData.metar && (
                     <Box sx={{ mt: 2, p: 2, bgcolor: 'grey.100', borderRadius: 1 }}>
-                      <Box component="span" variant="caption" color="text.secondary">
+                      <Typography variant="caption" color="text.secondary">
                         METAR:
-                      </Box>
-                      <Box component="div" variant="body2" sx={{ fontFamily: 'monospace', mt: 1 }}>
+                      </Typography>
+                      <Typography variant="body2" sx={{ fontFamily: 'monospace', mt: 1 }}>
                         {weatherData.metar}
-                      </Box>
+                      </Typography>
                     </Box>
                   )}
                 </CardContent>

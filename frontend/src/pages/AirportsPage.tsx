@@ -10,7 +10,6 @@ import {
   ListItem,
   ListItemText,
   Typography,
-  InputAdornment,
 } from '@mui/material'
 import { LocalAirport, Search, LocationOn } from '@mui/icons-material'
 import toast from 'react-hot-toast'
@@ -30,7 +29,6 @@ import type { Airport } from '../types'
 
 const AirportsPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('')
-  const [selectedIcao, setSelectedIcao] = useState<string>('')
   const [searchError, setSearchError] = useState<string>('')
   const [showHistory, setShowHistory] = useState(false)
 
@@ -61,13 +59,11 @@ const AirportsPage: React.FC = () => {
     }
 
     setSearchError('')
-    setSelectedIcao('')
     setShowHistory(false)
     searchMutation.mutate(searchTerm)
   }
 
   const handleSelectAirport = (icao: string) => {
-    setSelectedIcao(icao)
     detailsMutation.mutate(icao)
   }
 

@@ -1,7 +1,7 @@
 import { useMutation, UseMutationResult } from 'react-query'
 import toast from 'react-hot-toast'
 
-interface UseApiMutationOptions<TData, TVariables> {
+interface UseApiMutationOptions<TData> {
   onSuccess?: (data: TData) => void
   onError?: (error: Error) => void
   successMessage?: string
@@ -10,7 +10,7 @@ interface UseApiMutationOptions<TData, TVariables> {
 
 export function useApiMutation<TData, TVariables>(
   mutationFn: (variables: TVariables) => Promise<TData>,
-  options?: UseApiMutationOptions<TData, TVariables>
+  options?: UseApiMutationOptions<TData>
 ): UseMutationResult<TData, Error, TVariables> {
   return useMutation<TData, Error, TVariables>(
     mutationFn,
