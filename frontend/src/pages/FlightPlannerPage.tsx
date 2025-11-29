@@ -1,127 +1,128 @@
 import React, { useState } from 'react'
-import {
-  Paper,
-  Typography,
-  Grid,
-  TextField,
-  Button,
-  Card,
-  CardContent,
-  Box,
-  Chip,
-  Divider,
-} from '@mui/material'
+import { Grid, TextField, Card, CardContent, Box, Chip, Divider, Typography } from '@mui/material'
 import { Flight, Schedule, Speed, LocalGasStation } from '@mui/icons-material'
-import { useQuery } from 'react-query'
-import axios from 'axios'
 import toast from 'react-hot-toast'
-
-interface FlightPlan {
-  departure: string
-  destination: string
-  route: string[]
-  distance: number
-  estimated_time: number
-  fuel_required: number
-  weather_summary: string
-}
+import { 
+  PageHeader, 
+  FormSection, 
+  EmptyState, 
+  LoadingState, 
+  ResultsSection 
+} from '../components/shared'
+import { useApiMutation } from '../hooks'
+import { flightPlannerService } from '../services'
+import { validateAirportCode } from '../utils'
+import type { FlightPlan, FlightPlanRequest } from '../types'
 
 const FlightPlannerPage: React.FC = () => {
   const [departure, setDeparture] = useState('')
   const [destination, setDestination] = useState('')
   const [aircraft, setAircraft] = useState('')
-  const [flightPlan, setFlightPlan] = useState<FlightPlan | null>(null)
+  const [departureError, setDepartureError] = useState<string>('')
+  const [destinationError, setDestinationError] = useState<string>('')
 
-  const planFlight = async () => {
-    if (!departure || !destination) {
-      toast.error('Please enter both departure and destination airports')
+  const flightPlanMutation = useApiMutation<FlightPlan, FlightPlanRequest>(
+    (data) => flightPlannerService.planRoute(data),
+    {
+      successMessage: 'Flight plan generated successfully!',
+    }
+  )
+
+  const planFlight = () => {
+    const departureValidation = validateAirportCode(departure)
+    const destinationValidation = validateAirportCode(destination)
+
+    if (!departureValidation.valid) {
+      setDepartureError(departureValidation.error || '')
+      toast.error(departureValidation.error || 'Invalid departure airport')
       return
     }
 
-    try {
-      const response = await axios.post('/api/plan_route', {
-        departure,
-        destination,
-        aircraft_type: aircraft || 'C172'
-      })
-      setFlightPlan(response.data)
-      toast.success('Flight plan generated successfully!')
-    } catch (error) {
-      toast.error('Failed to generate flight plan')
-      console.error('Flight planning error:', error)
+    if (!destinationValidation.valid) {
+      setDestinationError(destinationValidation.error || '')
+      toast.error(destinationValidation.error || 'Invalid destination airport')
+      return
     }
+
+    setDepartureError('')
+    setDestinationError('')
+
+    flightPlanMutation.mutate({
+      departure: departure.toUpperCase(),
+      destination: destination.toUpperCase(),
+      aircraft_type: aircraft || 'C172',
+    })
   }
+
+  const handleDepartureChange = (value: string) => {
+    setDeparture(value.toUpperCase())
+    if (departureError) setDepartureError('')
+  }
+
+  const handleDestinationChange = (value: string) => {
+    setDestination(value.toUpperCase())
+    if (destinationError) setDestinationError('')
+  }
+
+  const flightPlan = flightPlanMutation.data
 
   return (
     <Box>
-      <Typography variant="h4" gutterBottom>
-        <Flight sx={{ mr: 1, verticalAlign: 'middle' }} />
-        VFR Flight Planner
-      </Typography>
+      <PageHeader icon={<Flight />} title="VFR Flight Planner" />
       
       <Grid container spacing={3}>
         <Grid item xs={12} md={6}>
-          <Paper sx={{ p: 3 }}>
-            <Typography variant="h6" gutterBottom>
-              Flight Details
-            </Typography>
-            
-            <Grid container spacing={2}>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  label="Departure Airport"
-                  placeholder="KPAO"
-                  value={departure}
-                  onChange={(e) => setDeparture(e.target.value.toUpperCase())}
-                  helperText="Enter ICAO or IATA code"
-                />
-              </Grid>
-              
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  label="Destination Airport"
-                  placeholder="KSQL"
-                  value={destination}
-                  onChange={(e) => setDestination(e.target.value.toUpperCase())}
-                  helperText="Enter ICAO or IATA code"
-                />
-              </Grid>
-              
-              <Grid item xs={12}>
-                <TextField
-                  fullWidth
-                  label="Aircraft Type"
-                  placeholder="C172"
-                  value={aircraft}
-                  onChange={(e) => setAircraft(e.target.value)}
-                  helperText="Optional: Aircraft type for performance calculations"
-                />
-              </Grid>
-              
-              <Grid item xs={12}>
-                <Button
-                  variant="contained"
-                  size="large"
-                  onClick={planFlight}
-                  fullWidth
-                  sx={{ mt: 2 }}
-                >
-                  Generate Flight Plan
-                </Button>
-              </Grid>
+          <FormSection
+            title="Flight Details"
+            onSubmit={planFlight}
+            buttonText="Generate Flight Plan"
+            isLoading={flightPlanMutation.isLoading}
+          >
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label="Departure Airport"
+                placeholder="KPAO"
+                value={departure}
+                onChange={(e) => handleDepartureChange(e.target.value)}
+                helperText={departureError || "Enter ICAO or IATA code"}
+                error={!!departureError}
+                disabled={flightPlanMutation.isLoading}
+              />
             </Grid>
-          </Paper>
+            
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label="Destination Airport"
+                placeholder="KSQL"
+                value={destination}
+                onChange={(e) => handleDestinationChange(e.target.value)}
+                helperText={destinationError || "Enter ICAO or IATA code"}
+                error={!!destinationError}
+                disabled={flightPlanMutation.isLoading}
+              />
+            </Grid>
+            
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                label="Aircraft Type"
+                placeholder="C172"
+                value={aircraft}
+                onChange={(e) => setAircraft(e.target.value)}
+                helperText="Optional: Aircraft type for performance calculations"
+                disabled={flightPlanMutation.isLoading}
+              />
+            </Grid>
+          </FormSection>
         </Grid>
         
         <Grid item xs={12} md={6}>
-          {flightPlan ? (
-            <Paper sx={{ p: 3 }}>
-              <Typography variant="h6" gutterBottom>
-                Flight Plan Results
-              </Typography>
-              
+          {flightPlanMutation.isLoading ? (
+            <LoadingState message="Generating flight plan..." />
+          ) : flightPlan ? (
+            <ResultsSection title="Flight Plan Results">
               <Card sx={{ mb: 2 }}>
                 <CardContent>
                   <Typography variant="subtitle1" gutterBottom>
@@ -181,14 +182,12 @@ const FlightPlannerPage: React.FC = () => {
                   )}
                 </CardContent>
               </Card>
-            </Paper>
+            </ResultsSection>
           ) : (
-            <Paper sx={{ p: 3, textAlign: 'center', color: 'text.secondary' }}>
-              <Flight sx={{ fontSize: 64, mb: 2, opacity: 0.3 }} />
-              <Typography variant="h6">
-                Enter flight details to generate your VFR flight plan
-              </Typography>
-            </Paper>
+            <EmptyState
+              icon={<Flight />}
+              message="Enter flight details to generate your VFR flight plan"
+            />
           )}
         </Grid>
       </Grid>

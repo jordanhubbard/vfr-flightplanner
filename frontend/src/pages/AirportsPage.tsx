@@ -1,10 +1,7 @@
 import React, { useState } from 'react'
 import {
-  Paper,
-  Typography,
   Grid,
   TextField,
-  Button,
   Card,
   CardContent,
   Box,
@@ -12,111 +9,118 @@ import {
   List,
   ListItem,
   ListItemText,
+  Typography,
 } from '@mui/material'
 import { LocalAirport, Search, LocationOn } from '@mui/icons-material'
-import { useQuery } from 'react-query'
-import axios from 'axios'
 import toast from 'react-hot-toast'
-
-interface Airport {
-  icao: string
-  iata: string
-  name: string
-  city: string
-  country: string
-  latitude: number
-  longitude: number
-  elevation: number
-  type: string
-}
+import { 
+  PageHeader, 
+  FormSection, 
+  EmptyState, 
+  LoadingState, 
+  ResultsSection 
+} from '../components/shared'
+import { useApiMutation } from '../hooks'
+import { airportService } from '../services'
+import { validateRequired } from '../utils'
+import type { Airport } from '../types'
 
 const AirportsPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('')
-  const [airports, setAirports] = useState<Airport[]>([])
-  const [selectedAirport, setSelectedAirport] = useState<Airport | null>(null)
+  const [selectedIcao, setSelectedIcao] = useState<string>('')
+  const [searchError, setSearchError] = useState<string>('')
 
-  const searchAirports = async () => {
-    if (!searchTerm) {
-      toast.error('Please enter a search term')
+  const searchMutation = useApiMutation<Airport[], string>(
+    (query) => airportService.search(query),
+    {
+      successMessage: undefined, // Custom message after success
+      onSuccess: (data) => {
+        toast.success(`Found ${data.length} airport${data.length !== 1 ? 's' : ''}`)
+      },
+    }
+  )
+
+  const detailsMutation = useApiMutation<Airport, string>(
+    (icao) => airportService.getDetails(icao)
+  )
+
+  const handleSearch = () => {
+    const validation = validateRequired(searchTerm, 'Search term')
+    if (!validation.valid) {
+      setSearchError(validation.error || '')
+      toast.error(validation.error || 'Invalid search term')
       return
     }
 
-    try {
-      const response = await axios.get(`/api/airports/search?q=${searchTerm}`)
-      setAirports(response.data)
-      toast.success(`Found ${response.data.length} airports`)
-    } catch (error) {
-      toast.error('Failed to search airports')
-      console.error('Airport search error:', error)
-    }
+    setSearchError('')
+    setSelectedIcao('')
+    searchMutation.mutate(searchTerm)
   }
 
-  const getAirportDetails = async (icao: string) => {
-    try {
-      const response = await axios.get(`/api/airports/${icao}`)
-      setSelectedAirport(response.data)
-    } catch (error) {
-      toast.error('Failed to get airport details')
-      console.error('Airport details error:', error)
-    }
+  const handleSelectAirport = (icao: string) => {
+    setSelectedIcao(icao)
+    detailsMutation.mutate(icao)
   }
+
+  const handleSearchTermChange = (value: string) => {
+    setSearchTerm(value)
+    if (searchError) setSearchError('')
+  }
+
+  const airports = searchMutation.data || []
+  const selectedAirport = detailsMutation.data
 
   return (
     <Box>
-      <Typography variant="h4" gutterBottom>
-        <LocalAirport sx={{ mr: 1, verticalAlign: 'middle' }} />
-        Airport Information
-      </Typography>
+      <PageHeader icon={<LocalAirport />} title="Airport Information" />
       
       <Grid container spacing={3}>
         <Grid item xs={12} md={6}>
-          <Paper sx={{ p: 3 }}>
-            <Typography variant="h6" gutterBottom>
-              Search Airports
-            </Typography>
-            
-            <Grid container spacing={2}>
-              <Grid item xs={12}>
-                <TextField
-                  fullWidth
-                  label="Search"
-                  placeholder="Airport name, city, or code"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  helperText="Enter airport name, city, or ICAO/IATA code"
-                />
-              </Grid>
-              
-              <Grid item xs={12}>
-                <Button
-                  variant="contained"
-                  size="large"
-                  onClick={searchAirports}
-                  fullWidth
-                  sx={{ mt: 2 }}
-                  startIcon={<Search />}
-                >
-                  Search Airports
-                </Button>
-              </Grid>
+          <FormSection
+            title="Search Airports"
+            onSubmit={handleSearch}
+            buttonText="Search Airports"
+            isLoading={searchMutation.isLoading}
+          >
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                label="Search"
+                placeholder="Airport name, city, or code"
+                value={searchTerm}
+                onChange={(e) => handleSearchTermChange(e.target.value)}
+                helperText={searchError || "Enter airport name, city, or ICAO/IATA code"}
+                error={!!searchError}
+                disabled={searchMutation.isLoading}
+                InputProps={{
+                  startAdornment: <Search sx={{ mr: 1, color: 'action.disabled' }} />,
+                }}
+              />
             </Grid>
+          </FormSection>
             
-            {airports.length > 0 && (
-              <Box sx={{ mt: 3 }}>
-                <Typography variant="h6" gutterBottom>
-                  Search Results ({airports.length})
-                </Typography>
+          {searchMutation.isLoading ? (
+            <Box sx={{ mt: 3 }}>
+              <LoadingState message="Searching airports..." />
+            </Box>
+          ) : airports.length > 0 ? (
+            <Box sx={{ mt: 3 }}>
+              <ResultsSection title={`Search Results (${airports.length})`}>
                 <List sx={{ maxHeight: 400, overflow: 'auto' }}>
                   {airports.map((airport) => (
                     <ListItem
                       key={airport.icao}
-                      button
-                      onClick={() => getAirportDetails(airport.icao)}
+                      component="button"
+                      onClick={() => handleSelectAirport(airport.icao)}
                       sx={{ 
                         border: 1, 
                         borderColor: 'divider', 
                         borderRadius: 1, 
-                        mb: 1 
+                        mb: 1,
+                        cursor: 'pointer',
+                        '&:hover': {
+                          bgcolor: 'action.hover',
+                        },
                       }}
                     >
                       <ListItemText
@@ -144,18 +148,16 @@ const AirportsPage: React.FC = () => {
                     </ListItem>
                   ))}
                 </List>
-              </Box>
-            )}
-          </Paper>
+              </ResultsSection>
+            </Box>
+          ) : null}
         </Grid>
         
         <Grid item xs={12} md={6}>
-          {selectedAirport ? (
-            <Paper sx={{ p: 3 }}>
-              <Typography variant="h6" gutterBottom>
-                Airport Details
-              </Typography>
-              
+          {detailsMutation.isLoading ? (
+            <LoadingState message="Loading airport details..." />
+          ) : selectedAirport ? (
+            <ResultsSection title="Airport Details">
               <Card>
                 <CardContent>
                   <Typography variant="h5" gutterBottom>
@@ -220,14 +222,12 @@ const AirportsPage: React.FC = () => {
                   </Grid>
                 </CardContent>
               </Card>
-            </Paper>
+            </ResultsSection>
           ) : (
-            <Paper sx={{ p: 3, textAlign: 'center', color: 'text.secondary' }}>
-              <LocalAirport sx={{ fontSize: 64, mb: 2, opacity: 0.3 }} />
-              <Typography variant="h6">
-                Search for airports and select one to view details
-              </Typography>
-            </Paper>
+            <EmptyState
+              icon={<LocalAirport />}
+              message="Search for airports and select one to view details"
+            />
           )}
         </Grid>
       </Grid>

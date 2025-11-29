@@ -1,163 +1,145 @@
 import React, { useState } from 'react'
-import {
-  Paper,
-  Typography,
-  Grid,
-  TextField,
-  Button,
-  Card,
-  CardContent,
-  Box,
-  Chip,
-} from '@mui/material'
+import { Grid, TextField, Card, CardContent, Box } from '@mui/material'
 import { Cloud, Thermostat, Air, Visibility } from '@mui/icons-material'
-import { useQuery } from 'react-query'
-import axios from 'axios'
 import toast from 'react-hot-toast'
-
-interface WeatherData {
-  airport: string
-  conditions: string
-  temperature: number
-  wind_speed: number
-  wind_direction: number
-  visibility: number
-  ceiling: number
-  metar: string
-}
+import { 
+  PageHeader, 
+  FormSection, 
+  EmptyState, 
+  LoadingState, 
+  ResultsSection 
+} from '../components/shared'
+import { useApiMutation } from '../hooks'
+import { weatherService } from '../services'
+import { validateAirportCode } from '../utils'
+import type { WeatherData } from '../types'
 
 const WeatherPage: React.FC = () => {
   const [airport, setAirport] = useState('')
-  const [weatherData, setWeatherData] = useState<WeatherData | null>(null)
+  const [validationError, setValidationError] = useState<string>('')
 
-  const getWeather = async () => {
-    if (!airport) {
-      toast.error('Please enter an airport code')
+  const weatherMutation = useApiMutation<WeatherData, string>(
+    (airportCode) => weatherService.getWeather(airportCode),
+    {
+      successMessage: 'Weather data retrieved successfully!',
+    }
+  )
+
+  const getWeather = () => {
+    const validation = validateAirportCode(airport)
+    if (!validation.valid) {
+      setValidationError(validation.error || '')
+      toast.error(validation.error || 'Invalid airport code')
       return
     }
+    
+    setValidationError('')
+    weatherMutation.mutate(airport.toUpperCase())
+  }
 
-    try {
-      const response = await axios.get(`/api/weather/${airport}`)
-      setWeatherData(response.data)
-      toast.success('Weather data retrieved successfully!')
-    } catch (error) {
-      toast.error('Failed to get weather data')
-      console.error('Weather error:', error)
+  const handleAirportChange = (value: string) => {
+    setAirport(value.toUpperCase())
+    if (validationError) {
+      setValidationError('')
     }
   }
 
+  const weatherData = weatherMutation.data
+
   return (
     <Box>
-      <Typography variant="h4" gutterBottom>
-        <Cloud sx={{ mr: 1, verticalAlign: 'middle' }} />
-        Weather Information
-      </Typography>
+      <PageHeader icon={<Cloud />} title="Weather Information" />
       
       <Grid container spacing={3}>
         <Grid item xs={12} md={6}>
-          <Paper sx={{ p: 3 }}>
-            <Typography variant="h6" gutterBottom>
-              Airport Weather
-            </Typography>
-            
-            <Grid container spacing={2}>
-              <Grid item xs={12}>
-                <TextField
-                  fullWidth
-                  label="Airport Code"
-                  placeholder="KPAO"
-                  value={airport}
-                  onChange={(e) => setAirport(e.target.value.toUpperCase())}
-                  helperText="Enter ICAO or IATA code"
-                />
-              </Grid>
-              
-              <Grid item xs={12}>
-                <Button
-                  variant="contained"
-                  size="large"
-                  onClick={getWeather}
-                  fullWidth
-                  sx={{ mt: 2 }}
-                >
-                  Get Weather
-                </Button>
-              </Grid>
+          <FormSection
+            title="Airport Weather"
+            onSubmit={getWeather}
+            buttonText="Get Weather"
+            isLoading={weatherMutation.isLoading}
+          >
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                label="Airport Code"
+                placeholder="KPAO"
+                value={airport}
+                onChange={(e) => handleAirportChange(e.target.value)}
+                helperText={validationError || "Enter ICAO or IATA code"}
+                error={!!validationError}
+                disabled={weatherMutation.isLoading}
+              />
             </Grid>
-          </Paper>
+          </FormSection>
         </Grid>
         
         <Grid item xs={12} md={6}>
-          {weatherData ? (
-            <Paper sx={{ p: 3 }}>
-              <Typography variant="h6" gutterBottom>
-                Current Weather - {weatherData.airport}
-              </Typography>
-              
+          {weatherMutation.isLoading ? (
+            <LoadingState message="Fetching weather data..." />
+          ) : weatherData ? (
+            <ResultsSection title={`Current Weather - ${weatherData.airport}`}>
               <Card sx={{ mb: 2 }}>
                 <CardContent>
-                  <Typography variant="h6" gutterBottom>
+                  <Box variant="h6" component="div" gutterBottom>
                     {weatherData.conditions}
-                  </Typography>
+                  </Box>
                   
                   <Grid container spacing={2}>
                     <Grid item xs={6}>
                       <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
                         <Thermostat sx={{ mr: 1, color: 'primary.main' }} />
-                        <Typography variant="body1">
+                        <Box component="span" variant="body1">
                           {weatherData.temperature}°F
-                        </Typography>
+                        </Box>
                       </Box>
                     </Grid>
                     
                     <Grid item xs={6}>
                       <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
                         <Air sx={{ mr: 1, color: 'primary.main' }} />
-                        <Typography variant="body1">
+                        <Box component="span" variant="body1">
                           {weatherData.wind_direction}° @ {weatherData.wind_speed} kts
-                        </Typography>
+                        </Box>
                       </Box>
                     </Grid>
                     
                     <Grid item xs={6}>
                       <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
                         <Visibility sx={{ mr: 1, color: 'primary.main' }} />
-                        <Typography variant="body1">
+                        <Box component="span" variant="body1">
                           {weatherData.visibility} SM
-                        </Typography>
+                        </Box>
                       </Box>
                     </Grid>
                     
                     <Grid item xs={6}>
                       <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
                         <Cloud sx={{ mr: 1, color: 'primary.main' }} />
-                        <Typography variant="body1">
+                        <Box component="span" variant="body1">
                           {weatherData.ceiling} ft
-                        </Typography>
+                        </Box>
                       </Box>
                     </Grid>
                   </Grid>
                   
                   {weatherData.metar && (
                     <Box sx={{ mt: 2, p: 2, bgcolor: 'grey.100', borderRadius: 1 }}>
-                      <Typography variant="caption" color="text.secondary">
+                      <Box component="span" variant="caption" color="text.secondary">
                         METAR:
-                      </Typography>
-                      <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>
+                      </Box>
+                      <Box component="div" variant="body2" sx={{ fontFamily: 'monospace', mt: 1 }}>
                         {weatherData.metar}
-                      </Typography>
+                      </Box>
                     </Box>
                   )}
                 </CardContent>
               </Card>
-            </Paper>
+            </ResultsSection>
           ) : (
-            <Paper sx={{ p: 3, textAlign: 'center', color: 'text.secondary' }}>
-              <Cloud sx={{ fontSize: 64, mb: 2, opacity: 0.3 }} />
-              <Typography variant="h6">
-                Enter an airport code to get current weather conditions
-              </Typography>
-            </Paper>
+            <EmptyState
+              icon={<Cloud />}
+              message="Enter an airport code to get current weather conditions"
+            />
           )}
         </Grid>
       </Grid>
