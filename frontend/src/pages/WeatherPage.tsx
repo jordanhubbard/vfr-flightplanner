@@ -1,5 +1,5 @@
-import React, { useState } from 'react'
-import { Grid, TextField, Card, CardContent, Box } from '@mui/material'
+import React, { useState, useCallback } from 'react'
+import { Grid, TextField, Card, CardContent, Box, InputAdornment } from '@mui/material'
 import { Cloud, Thermostat, Air, Visibility } from '@mui/icons-material'
 import toast from 'react-hot-toast'
 import { 
@@ -7,9 +7,11 @@ import {
   FormSection, 
   EmptyState, 
   LoadingState, 
-  ResultsSection 
+  ResultsSection,
+  SearchHistoryDropdown,
+  FavoriteButton,
 } from '../components/shared'
-import { useApiMutation } from '../hooks'
+import { useApiMutation, useSearchHistory, useFavorites } from '../hooks'
 import { weatherService } from '../services'
 import { validateAirportCode } from '../utils'
 import type { WeatherData } from '../types'
@@ -17,11 +19,18 @@ import type { WeatherData } from '../types'
 const WeatherPage: React.FC = () => {
   const [airport, setAirport] = useState('')
   const [validationError, setValidationError] = useState<string>('')
+  const [showHistory, setShowHistory] = useState(false)
+
+  const { addToHistory, getRecentSearches, clearHistory } = useSearchHistory()
+  const { isFavorite, addFavorite, removeFavorite } = useFavorites()
 
   const weatherMutation = useApiMutation<WeatherData, string>(
     (airportCode) => weatherService.getWeather(airportCode),
     {
       successMessage: 'Weather data retrieved successfully!',
+      onSuccess: () => {
+        addToHistory(airport.toUpperCase(), 'weather')
+      },
     }
   )
 
@@ -34,6 +43,7 @@ const WeatherPage: React.FC = () => {
     }
     
     setValidationError('')
+    setShowHistory(false)
     weatherMutation.mutate(airport.toUpperCase())
   }
 
@@ -44,7 +54,31 @@ const WeatherPage: React.FC = () => {
     }
   }
 
+  const handleFavoriteToggle = useCallback(() => {
+    const currentAirport = weatherMutation.data?.airport || airport.toUpperCase()
+    if (isFavorite(currentAirport)) {
+      removeFavorite(currentAirport)
+      toast.success('Removed from favorites')
+    } else {
+      addFavorite(currentAirport, weatherMutation.data?.airport)
+      toast.success('Added to favorites')
+    }
+  }, [airport, weatherMutation.data, isFavorite, addFavorite, removeFavorite])
+
+  const handleHistorySelect = useCallback((query: string) => {
+    setAirport(query)
+    setShowHistory(false)
+    // Auto-fetch weather for selected item
+    const validation = validateAirportCode(query)
+    if (validation.valid) {
+      weatherMutation.mutate(query)
+    }
+  }, [weatherMutation])
+
+  const recentSearches = getRecentSearches('weather', 5)
+
   const weatherData = weatherMutation.data
+  const currentAirport = weatherData?.airport || airport.toUpperCase()
 
   return (
     <Box>
@@ -59,16 +93,43 @@ const WeatherPage: React.FC = () => {
             isLoading={weatherMutation.isLoading}
           >
             <Grid item xs={12}>
-              <TextField
-                fullWidth
-                label="Airport Code"
-                placeholder="KPAO"
-                value={airport}
-                onChange={(e) => handleAirportChange(e.target.value)}
-                helperText={validationError || "Enter ICAO or IATA code"}
-                error={!!validationError}
-                disabled={weatherMutation.isLoading}
-              />
+              <Box sx={{ position: 'relative' }}>
+                <TextField
+                  fullWidth
+                  label="Airport Code"
+                  placeholder="KPAO"
+                  value={airport}
+                  onChange={(e) => handleAirportChange(e.target.value)}
+                  onFocus={() => setShowHistory(true)}
+                  onBlur={() => setTimeout(() => setShowHistory(false), 200)}
+                  helperText={validationError || "Enter ICAO or IATA code"}
+                  error={!!validationError}
+                  disabled={weatherMutation.isLoading}
+                  InputProps={{
+                    endAdornment: currentAirport && (
+                      <InputAdornment position="end">
+                        <FavoriteButton
+                          isFavorite={isFavorite(currentAirport)}
+                          onToggle={handleFavoriteToggle}
+                          size="small"
+                          label={currentAirport}
+                        />
+                      </InputAdornment>
+                    ),
+                  }}
+                />
+                {showHistory && recentSearches.length > 0 && (
+                  <SearchHistoryDropdown
+                    items={recentSearches}
+                    onSelect={handleHistorySelect}
+                    onClear={() => {
+                      clearHistory()
+                      toast.success('Search history cleared')
+                    }}
+                    emptyMessage="No recent weather searches"
+                  />
+                )}
+              </Box>
             </Grid>
           </FormSection>
         </Grid>

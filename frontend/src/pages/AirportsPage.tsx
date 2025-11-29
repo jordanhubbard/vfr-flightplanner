@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useCallback } from 'react'
 import {
   Grid,
   TextField,
@@ -10,6 +10,7 @@ import {
   ListItem,
   ListItemText,
   Typography,
+  InputAdornment,
 } from '@mui/material'
 import { LocalAirport, Search, LocationOn } from '@mui/icons-material'
 import toast from 'react-hot-toast'
@@ -18,9 +19,11 @@ import {
   FormSection, 
   EmptyState, 
   LoadingState, 
-  ResultsSection 
+  ResultsSection,
+  SearchHistoryDropdown,
+  FavoriteButton,
 } from '../components/shared'
-import { useApiMutation } from '../hooks'
+import { useApiMutation, useSearchHistory, useFavorites } from '../hooks'
 import { airportService } from '../services'
 import { validateRequired } from '../utils'
 import type { Airport } from '../types'
@@ -29,13 +32,18 @@ const AirportsPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedIcao, setSelectedIcao] = useState<string>('')
   const [searchError, setSearchError] = useState<string>('')
+  const [showHistory, setShowHistory] = useState(false)
+
+  const { addToHistory, getRecentSearches, clearHistory } = useSearchHistory()
+  const { isFavorite, addFavorite, removeFavorite } = useFavorites()
 
   const searchMutation = useApiMutation<Airport[], string>(
     (query) => airportService.search(query),
     {
-      successMessage: undefined, // Custom message after success
+      successMessage: undefined,
       onSuccess: (data) => {
         toast.success(`Found ${data.length} airport${data.length !== 1 ? 's' : ''}`)
+        addToHistory(searchTerm, 'airport')
       },
     }
   )
@@ -54,6 +62,7 @@ const AirportsPage: React.FC = () => {
 
     setSearchError('')
     setSelectedIcao('')
+    setShowHistory(false)
     searchMutation.mutate(searchTerm)
   }
 
@@ -66,6 +75,25 @@ const AirportsPage: React.FC = () => {
     setSearchTerm(value)
     if (searchError) setSearchError('')
   }
+
+  const handleFavoriteToggle = useCallback((airport: Airport) => {
+    if (isFavorite(airport.icao)) {
+      removeFavorite(airport.icao)
+      toast.success('Removed from favorites')
+    } else {
+      addFavorite(airport.icao, airport.name)
+      toast.success('Added to favorites')
+    }
+  }, [isFavorite, addFavorite, removeFavorite])
+
+  const handleHistorySelect = useCallback((query: string) => {
+    setSearchTerm(query)
+    setShowHistory(false)
+    // Auto-search
+    searchMutation.mutate(query)
+  }, [searchMutation])
+
+  const recentSearches = getRecentSearches('airport', 5)
 
   const airports = searchMutation.data || []
   const selectedAirport = detailsMutation.data
@@ -83,19 +111,34 @@ const AirportsPage: React.FC = () => {
             isLoading={searchMutation.isLoading}
           >
             <Grid item xs={12}>
-              <TextField
-                fullWidth
-                label="Search"
-                placeholder="Airport name, city, or code"
-                value={searchTerm}
-                onChange={(e) => handleSearchTermChange(e.target.value)}
-                helperText={searchError || "Enter airport name, city, or ICAO/IATA code"}
-                error={!!searchError}
-                disabled={searchMutation.isLoading}
-                InputProps={{
-                  startAdornment: <Search sx={{ mr: 1, color: 'action.disabled' }} />,
-                }}
-              />
+              <Box sx={{ position: 'relative' }}>
+                <TextField
+                  fullWidth
+                  label="Search"
+                  placeholder="Airport name, city, or code"
+                  value={searchTerm}
+                  onChange={(e) => handleSearchTermChange(e.target.value)}
+                  onFocus={() => setShowHistory(true)}
+                  onBlur={() => setTimeout(() => setShowHistory(false), 200)}
+                  helperText={searchError || "Enter airport name, city, or ICAO/IATA code"}
+                  error={!!searchError}
+                  disabled={searchMutation.isLoading}
+                  InputProps={{
+                    startAdornment: <Search sx={{ mr: 1, color: 'action.disabled' }} />,
+                  }}
+                />
+                {showHistory && recentSearches.length > 0 && (
+                  <SearchHistoryDropdown
+                    items={recentSearches}
+                    onSelect={handleHistorySelect}
+                    onClear={() => {
+                      clearHistory()
+                      toast.success('Search history cleared')
+                    }}
+                    emptyMessage="No recent airport searches"
+                  />
+                )}
+              </Box>
             </Grid>
           </FormSection>
             
@@ -122,6 +165,14 @@ const AirportsPage: React.FC = () => {
                           bgcolor: 'action.hover',
                         },
                       }}
+                      secondaryAction={
+                        <FavoriteButton
+                          isFavorite={isFavorite(airport.icao)}
+                          onToggle={() => handleFavoriteToggle(airport)}
+                          size="small"
+                          label={airport.icao}
+                        />
+                      }
                     >
                       <ListItemText
                         primary={
@@ -160,9 +211,16 @@ const AirportsPage: React.FC = () => {
             <ResultsSection title="Airport Details">
               <Card>
                 <CardContent>
-                  <Typography variant="h5" gutterBottom>
-                    {selectedAirport.name}
-                  </Typography>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <Typography variant="h5" gutterBottom>
+                      {selectedAirport.name}
+                    </Typography>
+                    <FavoriteButton
+                      isFavorite={isFavorite(selectedAirport.icao)}
+                      onToggle={() => handleFavoriteToggle(selectedAirport)}
+                      label={selectedAirport.icao}
+                    />
+                  </Box>
                   
                   <Box sx={{ mb: 2 }}>
                     <Chip 

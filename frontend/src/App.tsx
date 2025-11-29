@@ -1,6 +1,7 @@
 import React, { lazy, Suspense } from 'react'
-import { Routes, Route } from 'react-router-dom'
+import { Routes, Route, useLocation } from 'react-router-dom'
 import { Container, AppBar, Toolbar, Typography, Box } from '@mui/material'
+import { motion, AnimatePresence } from 'framer-motion'
 import Navigation from './components/Navigation'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { LoadingState } from './components/shared'
@@ -10,7 +11,33 @@ const FlightPlannerPage = lazy(() => import('./pages/FlightPlannerPage'))
 const WeatherPage = lazy(() => import('./pages/WeatherPage'))
 const AirportsPage = lazy(() => import('./pages/AirportsPage'))
 
+// Animation variants for page transitions
+const pageVariants = {
+  initial: {
+    opacity: 0,
+    y: 20,
+  },
+  animate: {
+    opacity: 1,
+    y: 0,
+    transition: {
+      duration: 0.3,
+      ease: 'easeOut',
+    },
+  },
+  exit: {
+    opacity: 0,
+    y: -20,
+    transition: {
+      duration: 0.2,
+      ease: 'easeIn',
+    },
+  },
+}
+
 function App() {
+  const location = useLocation()
+
   return (
     <ErrorBoundary>
       <Box sx={{ flexGrow: 1, minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
@@ -31,11 +58,21 @@ function App() {
           role="main"
         >
           <Suspense fallback={<LoadingState message="Loading page..." />}>
-            <Routes>
-              <Route path="/" element={<FlightPlannerPage />} />
-              <Route path="/weather" element={<WeatherPage />} />
-              <Route path="/airports" element={<AirportsPage />} />
-            </Routes>
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={location.pathname}
+                variants={pageVariants}
+                initial="initial"
+                animate="animate"
+                exit="exit"
+              >
+                <Routes location={location}>
+                  <Route path="/" element={<FlightPlannerPage />} />
+                  <Route path="/weather" element={<WeatherPage />} />
+                  <Route path="/airports" element={<AirportsPage />} />
+                </Routes>
+              </motion.div>
+            </AnimatePresence>
           </Suspense>
         </Container>
       </Box>
