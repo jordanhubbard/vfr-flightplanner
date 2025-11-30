@@ -8,15 +8,20 @@ import asyncio
 import logging
 from typing import Dict, Any, List
 
-from fastapi import APIRouter, HTTPException, Body, Query, Request
+from fastapi import APIRouter, HTTPException, Body, Query, Request, Path
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
 from app.schemas import (
-    AirportSearchRequest, AirportSearchResponse, AirportResponse, 
-    MetarRequest, MetarResponse, AirportInfo
+    AirportSearchRequest,
+    AirportSearchResponse,
+    AirportResponse,
+    MetarRequest,
+    MetarResponse,
+    AirportInfo,
+    AirportBasic,
 )
-from app.models.airport import get_airports, get_airport_coordinates, get_metar_data
+from app.models.airport import get_airports, get_airport_coordinates, get_metar_data, load_airport_cache
 
 logger = logging.getLogger(__name__)
 
@@ -96,6 +101,79 @@ async def search_airports(
         )
 
 
+@router.get("/airports/search", response_model=List[AirportBasic])
+@limiter.limit("30/minute")
+async def search_airports_text(
+    request: Request,
+    q: str = Query(..., description="Airport name, city, ICAO, or IATA code"),
+) -> List[AirportBasic]:
+    """
+    Text-based airport search used by the React frontend.
+
+    This endpoint performs a simple search over the cached airport database,
+    matching on ICAO/IATA codes, name, or city and returns a flattened schema
+    expected by the UI.
+    """
+    try:
+        query = q.strip().lower()
+        if not query:
+            raise HTTPException(status_code=400, detail="Search query is required")
+
+        airports_raw = await asyncio.to_thread(load_airport_cache)
+        results: List[AirportBasic] = []
+
+        for airport in airports_raw:
+            icao_code = (airport.get("icao") or airport.get("icaoCode") or "").upper()
+            iata_code = (airport.get("iata") or airport.get("iataCode") or "").upper()
+            name = (airport.get("name") or "").lower()
+            city = (airport.get("city") or "").lower()
+            country = (airport.get("country") or "").upper()
+
+            if not (icao_code or iata_code or name or city):
+                continue
+
+            if (
+                query in icao_code.lower()
+                or (iata_code and query in iata_code.lower())
+                or (name and query in name)
+                or (city and query in city)
+            ):
+                # Resolve coordinates with fallbacks
+                if "geometry" in airport and "coordinates" in airport["geometry"]:
+                    lon, lat = airport["geometry"]["coordinates"]
+                else:
+                    lat = airport.get("lat") or airport.get("latitude")
+                    lon = airport.get("lon") or airport.get("longitude")
+
+                if lat is None or lon is None:
+                    continue
+
+                results.append(
+                    AirportBasic(
+                        icao=icao_code,
+                        iata=iata_code or None,
+                        name=airport.get("name") or icao_code,
+                        city=airport.get("city"),
+                        country=country or None,
+                        latitude=float(lat),
+                        longitude=float(lon),
+                        elevation=airport.get("elevation"),
+                        type=airport.get("type"),
+                    )
+                )
+
+        return results
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error in search_airports_text: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail="Airport search service temporarily unavailable",
+        )
+
+
 @router.get("/airport", response_model=AirportResponse)
 @limiter.limit("30/minute")
 async def get_airport_info(
@@ -140,6 +218,48 @@ async def get_airport_info(
         raise HTTPException(
             status_code=500,
             detail="Airport lookup service temporarily unavailable"
+        )
+
+
+@router.get("/airports/{code}", response_model=AirportBasic)
+@limiter.limit("60/minute")
+async def get_airport_details(
+    request: Request,
+    code: str = Path(..., description="Airport ICAO or IATA code", min_length=3, max_length=4),
+) -> AirportBasic:
+    """
+    Get basic airport details by ICAO or IATA code for the React frontend.
+    """
+    try:
+        code = code.strip().upper()
+        logger.info(f"Airport details request for code: {code}")
+
+        airport_data = await asyncio.to_thread(get_airport_coordinates, code)
+        if not airport_data:
+            raise HTTPException(
+                status_code=404,
+                detail=f"No airport found with code {code}",
+            )
+
+        return AirportBasic(
+            icao=airport_data.get("icao") or code,
+            iata=airport_data.get("iata"),
+            name=airport_data.get("name") or code,
+            city=airport_data.get("city"),
+            country=airport_data.get("country"),
+            latitude=float(airport_data.get("latitude")),
+            longitude=float(airport_data.get("longitude")),
+            elevation=airport_data.get("elevation"),
+            type=airport_data.get("type"),
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error in get_airport_details: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail="Airport lookup service temporarily unavailable",
         )
 
 

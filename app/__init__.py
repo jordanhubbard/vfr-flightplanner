@@ -240,76 +240,78 @@ def add_react_routes(app: FastAPI, settings: Settings) -> None:
     from fastapi.staticfiles import StaticFiles
     import os
     
-    # Mount static files for React build
+    # Mount static files for React build (Vite outputs to app/static/dist)
     static_path = Path(__file__).parent / "static"
     static_path.mkdir(exist_ok=True)
     
-    # Mount the frontend dist directory
-    frontend_dist = Path(__file__).parent.parent / "frontend" / "dist"
+    # Frontend build output directory (matches Vite outDir)
+    frontend_dist = static_path / "dist"
     if frontend_dist.exists():
         app.mount("/assets", StaticFiles(directory=str(frontend_dist / "assets")), name="assets")
         
         # Serve React app for all non-API routes
         @app.get("/", response_class=HTMLResponse)
         async def serve_react_app():
-            """Serve the React application."""
-            # In development mode, return API info instead of serving React
-            if os.environ.get('ENVIRONMENT') == 'development':
-                return HTMLResponse(content=f"""
-                <!DOCTYPE html>
-                <html>
-                <head>
-                    <title>VFR Flight Planner API - Development Mode</title>
-                    <style>
-                        body {{ font-family: Arial, sans-serif; margin: 40px; background: #f5f5f5; }}
-                        .container {{ background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }}
-                        .api-link {{ display: inline-block; margin: 10px 0; padding: 10px 15px; background: #007bff; color: white; text-decoration: none; border-radius: 4px; }}
-                        .api-link:hover {{ background: #0056b3; }}
-                        .dev-info {{ background: #e7f3ff; padding: 15px; border-radius: 4px; margin: 20px 0; }}
-                    </style>
-                </head>
-                <body>
-                    <div class="container">
-                        <h1>✈️ VFR Flight Planner API</h1>
-                        <div class="dev-info">
-                            <strong>Development Mode Active</strong><br>
-                            FastAPI backend running on port 8080
-                        </div>
-                        <h2>API Documentation</h2>
-                        <a href="/api/docs" class="api-link">📚 Interactive API Docs (Swagger)</a><br>
-                        <a href="/api/redoc" class="api-link">📖 ReDoc Documentation</a><br>
-                        <a href="/api/health" class="api-link">❤️ Health Check</a>
-                        
-                        <h2>Quick Test</h2>
-                        <p>Get weather: <code>GET /api/weather/KPAO</code></p>
-                        <p>Search airports: <code>GET /api/airports/search?q=palo+alto</code></p>
-                    </div>
-                </body>
-                </html>
-                """)
-            
-            # Production mode: serve built React app
+            """Serve the React application or a helpful dev page."""
             try:
                 index_file = frontend_dist / "index.html"
-                if index_file.exists():
-                    with open(index_file, 'r', encoding='utf-8') as f:
-                        content = f.read()
-                    return HTMLResponse(content=content)
-                else:
+
+                # In pure backend-development mode (no built frontend), show API-oriented page
+                if os.environ.get('ENVIRONMENT') == 'development' and not index_file.exists():
                     return HTMLResponse(content=f"""
                     <!DOCTYPE html>
                     <html>
                     <head>
-                        <title>VFR Flight Planner</title>
+                        <title>VFR Flight Planner API - Development Mode</title>
+                        <style>
+                            body {{ font-family: Arial, sans-serif; margin: 40px; background: #f5f5f5; }}
+                            .container {{ background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }}
+                            .api-link {{ display: inline-block; margin: 10px 0; padding: 10px 15px; background: #007bff; color: white; text-decoration: none; border-radius: 4px; }}
+                            .api-link:hover {{ background: #0056b3; }}
+                            .dev-info {{ background: #e7f3ff; padding: 15px; border-radius: 4px; margin: 20px 0; }}
+                        </style>
                     </head>
                     <body>
-                        <h1>VFR Flight Planner</h1>
-                        <p>React build not found at: <code>{index_file}</code></p>
-                        <p>Please build the frontend:</p>
-                        <pre>cd frontend && npm run build</pre>
+                        <div class="container">
+                            <h1>✈️ VFR Flight Planner API</h1>
+                            <div class="dev-info">
+                                <strong>Development Mode Active</strong><br>
+                                FastAPI backend running on port 8080
+                            </div>
+                            <h2>API Documentation</h2>
+                            <a href="/api/docs" class="api-link">📚 Interactive API Docs (Swagger)</a><br>
+                            <a href="/api/redoc" class="api-link">📖 ReDoc Documentation</a><br>
+                            <a href="/api/health" class="api-link">❤️ Health Check</a>
+                            
+                            <h2>Quick Test</h2>
+                            <p>Get weather: <code>GET /api/weather/KPAO</code></p>
+                            <p>Search airports: <code>GET /api/airports/search?q=palo+alto</code></p>
+                        </div>
                     </body>
                     </html>
                     """)
+
+                # Serve built React app when available (any environment)
+                if index_file.exists():
+                    with open(index_file, 'r', encoding='utf-8') as f:
+                        content = f.read()
+                    return HTMLResponse(content=content)
+
+                # Fallback if build is missing even though dist directory exists
+                return HTMLResponse(content=f"""
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <title>VFR Flight Planner</title>
+                </head>
+                <body>
+                    <h1>VFR Flight Planner</h1>
+                    <p>React build not found at: <code>{index_file}</code></p>
+                    <p>Please build the frontend:</p>
+                    <pre>cd frontend && npm run build</pre>
+                </body>
+                </html>
+                """)
             except Exception as e:
                 return HTMLResponse(content=f"<h1>Error serving frontend: {e}</h1>", status_code=500)
         

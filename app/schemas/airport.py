@@ -180,6 +180,20 @@ class AirportSearchResponse(BaseModel):
         }
 
 
+class AirportBasic(BaseModel):
+    """Flattened airport schema tailored for the React frontend."""
+
+    icao: str = Field(..., description="ICAO airport code")
+    iata: Optional[str] = Field(None, description="IATA airport code")
+    name: str = Field(..., description="Airport name")
+    city: Optional[str] = Field(None, description="City or locality")
+    country: Optional[str] = Field(None, description="Country code")
+    latitude: float = Field(..., description="Latitude in decimal degrees")
+    longitude: float = Field(..., description="Longitude in decimal degrees")
+    elevation: Optional[float] = Field(None, description="Airport elevation in feet")
+    type: Optional[str] = Field(None, description="Airport type")
+
+
 class MetarRequest(BaseModel):
     """METAR data request schema."""
     codes: List[str] = Field(..., description="List of ICAO airport codes")

@@ -38,6 +38,42 @@ async def root(request: Request):
         )
 
 
+@router.get("/weather", response_class=HTMLResponse)
+async def weather_ui(request: Request):
+    """
+    Serve the main web interface for the weather UI route.
+
+    Currently this reuses the primary index template so that navigating directly
+    to /weather still loads the full frontend.
+    """
+    try:
+        return templates.TemplateResponse("index.html", {"request": request})
+    except Exception as e:
+        logger.error(f"Error serving weather page: {e}")
+        return HTMLResponse(
+            content="<h1>VFR Flight Planner</h1><p>Service temporarily unavailable</p>",
+            status_code=500,
+        )
+
+
+@router.get("/airports", response_class=HTMLResponse)
+async def airports_ui(request: Request):
+    """
+    Serve the main web interface for the airports UI route.
+
+    Currently this reuses the primary index template so that navigating directly
+    to /airports still loads the full frontend.
+    """
+    try:
+        return templates.TemplateResponse("index.html", {"request": request})
+    except Exception as e:
+        logger.error(f"Error serving airports page: {e}")
+        return HTMLResponse(
+            content="<h1>VFR Flight Planner</h1><p>Service temporarily unavailable</p>",
+            status_code=500,
+        )
+
+
 @router.get("/favicon.ico")
 async def favicon():
     """

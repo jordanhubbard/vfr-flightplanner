@@ -44,7 +44,7 @@ def test_weather_endpoint(client):
     """Test the weather endpoint with mocked data."""
     
     # Mock the async get_weather_data function
-    with patch('app.models.weather_async.get_weather_data_async') as mock_weather:
+    with patch('app.routers.weather.get_weather_data_async') as mock_weather:
         
         # Configure mock to return test data
         mock_data = {
@@ -52,17 +52,28 @@ def test_weather_endpoint(client):
                 'latitude': 37.7749,
                 'longitude': -122.4194
             },
+            # Minimal structure compatible with WeatherResponse via router normalization
             'forecast': [
                 {
                     'date': 1716940800,
                     'temp_max': 68,
-                    'temp_min': 52
+                    'temp_min': 52,
+                    'humidity': 55,
+                    'windspeed_max': 12,
+                    'winddirection': 270,
+                    'pressure': 1015.0,
+                    'precipitation_sum': 0.0,
+                    'weathercode': 1,
+                    'description': 'Clear'
                 }
             ],
             'current': {
                 'temperature': 62,
-                'windspeed': 10
+                'windspeed': 10,
+                'winddirection': 260,
+                'weathercode': 1
             },
+            'timezone': 'America/Los_Angeles',
             'overlays': {}
         }
         mock_weather.return_value = mock_data
@@ -111,8 +122,8 @@ def test_weather_endpoint_invalid_params(client):
 def test_airports_endpoint(client):
     """Test the airports endpoint with mocked data."""
     
-    # Mock the get_airports function
-    with patch('app.models.airport.get_airports') as mock_airports:
+    # Mock the get_airports function at the router import path
+    with patch('app.routers.airport.get_airports') as mock_airports:
         
         # Configure mock to return test data
         mock_data = {
@@ -174,8 +185,8 @@ def test_airports_endpoint(client):
 def test_airport_endpoint(client):
     """Test the airport endpoint with mocked data."""
     
-    # Mock the get_airport_coordinates function
-    with patch('app.models.airport.get_airport_coordinates') as mock_airport:
+    # Mock the get_airport_coordinates function at the router import path
+    with patch('app.routers.airport.get_airport_coordinates') as mock_airport:
         
         # Configure mock to return test data
         mock_data = {
@@ -208,17 +219,17 @@ def test_airport_endpoint(client):
         args, kwargs = mock_airport.call_args
         assert args[0] == 'KSFO'
         
-        # Test with invalid code
+        # Test with invalid code (too short) should trigger FastAPI validation
         mock_airport.return_value = None
-        response = client.get('/api/airport?code=INVALID')
-        assert response.status_code == 404
+        response = client.get('/api/airport?code=AB')
+        assert response.status_code == 422  # Query param validation error for code length
 
 
 def test_plan_route_endpoint(client):
     """Test the flight plan endpoint with mocked data."""
     
-    # Mock the plan_route function
-    with patch('app.models.flight_planner.plan_route') as mock_plan:
+    # Mock the plan_route function at the router import path
+    with patch('app.routers.flight_plan.plan_route') as mock_plan:
         
         # Configure mock to return test data
         mock_data = {

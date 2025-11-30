@@ -79,6 +79,23 @@ class WeatherResponse(BaseModel):
         }
 
 
+class AirportWeather(BaseModel):
+    """Simplified current-weather view for a single airport.
+
+    This schema is tailored for the frontend weather UI and is separate from the
+    detailed WeatherResponse forecast model.
+    """
+
+    airport: str = Field(..., description="Airport identifier (ICAO or IATA)")
+    conditions: str = Field(..., description="Summary of current conditions")
+    temperature: float = Field(..., description="Temperature in Fahrenheit")
+    wind_speed: float = Field(..., description="Wind speed in knots")
+    wind_direction: int = Field(..., description="Wind direction in degrees")
+    visibility: float = Field(..., description="Visibility in statute miles")
+    ceiling: float = Field(..., description="Ceiling in feet AGL (0 if unlimited/unknown)")
+    metar: str = Field(..., description="Raw METAR string for the airport")
+
+
 class AreaForecastRequest(BaseModel):
     """Area forecast request schema."""
     bounds: Dict[str, float] = Field(..., description="Geographic bounds")
