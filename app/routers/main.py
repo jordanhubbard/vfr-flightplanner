@@ -9,6 +9,8 @@ from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.templating import Jinja2Templates
 
+from app.config import settings
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
@@ -29,7 +31,10 @@ async def root(request: Request):
         HTMLResponse: Main web interface
     """
     try:
-        return templates.TemplateResponse("index.html", {"request": request})
+        return templates.TemplateResponse("index.html", {
+            "request": request,
+            "api_key": settings.openweather_api_key
+        })
     except Exception as e:
         logger.error(f"Error serving main page: {e}")
         return HTMLResponse(

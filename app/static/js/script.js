@@ -177,28 +177,33 @@ function updateApiStatus() {
     fetch('/api/health')
         .then(response => response.json())
         .then(data => {
+            // Extract services from response
+            const services = data.services || {};
+            const owm = services.openweathermap || {};
+            const meteo = services.openmeteo || {};
+            
             // Update OpenWeatherMap status
-            owmStatus.className = `status-dot ${data.openweathermap.status ? 'online' : 'offline'}`;
-            if (!data.openweathermap.status) {
-                owmErrorMessage.textContent = data.openweathermap.error || 'Unknown error';
+            owmStatus.className = `status-dot ${owm.status ? 'online' : 'offline'}`;
+            if (!owm.status) {
+                owmErrorMessage.textContent = owm.error || 'Unknown error';
                 owmIndicator.classList.add('show-error');
             } else {
                 owmErrorMessage.textContent = 'No errors reported';
                 owmIndicator.classList.remove('show-error');
             }
-            owmLastCheck.textContent = `Last checked: ${formatTimestamp(data.openweathermap.timestamp)}`;
-            owmCalls.textContent = `API calls: ${data.openweathermap.api_calls}`;
+            owmLastCheck.textContent = `Last checked: ${formatTimestamp(owm.timestamp)}`;
+            owmCalls.textContent = `API calls: ${owm.api_calls || 0}`;
             
             // Update Open-Meteo status
-            meteoStatus.className = `status-dot ${data.openmeteo.status ? 'online' : 'offline'}`;
-            if (!data.openmeteo.status) {
-                meteoErrorMessage.textContent = data.openmeteo.error || 'Unknown error';
+            meteoStatus.className = `status-dot ${meteo.status ? 'online' : 'offline'}`;
+            if (!meteo.status) {
+                meteoErrorMessage.textContent = meteo.error || 'Unknown error';
                 meteoIndicator.classList.add('show-error');
             } else {
                 meteoErrorMessage.textContent = 'No errors reported';
                 meteoIndicator.classList.remove('show-error');
             }
-            meteoLastCheck.textContent = `Last checked: ${formatTimestamp(data.openmeteo.timestamp)}`;
+            meteoLastCheck.textContent = `Last checked: ${formatTimestamp(meteo.timestamp)}`;
         })
         .catch(error => {
             console.error('Error checking API health:', error);
