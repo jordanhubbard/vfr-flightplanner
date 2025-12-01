@@ -1265,17 +1265,31 @@ async function fetchWindBarbs(lat, lon) {
                         },
                         body: JSON.stringify({
                             lat: gridLat,
-                            lon: gridLon
+                            lon: gridLon,
+                            days: 1,
+                            overlays: []
                         })
                     })
                     .then(response => response.json())
-                    .then(data => ({
-                        lat: gridLat,
-                        lon: gridLon,
-                        windSpeed: data.current?.wind_speed_kt || 0,
-                        windDirection: data.current?.wind_dir_degrees || 0
-                    }))
-                    .catch(() => null)
+                    .then(data => {
+                        // Extract current conditions from first forecast item
+                        const current = data.forecast && data.forecast[0];
+                        if (!current) {
+                            return null;
+                        }
+                        // Convert wind speed from m/s to knots
+                        const windSpeedKt = Math.round((current.wind_speed || 0) * 1.94384);
+                        return {
+                            lat: gridLat,
+                            lon: gridLon,
+                            windSpeed: windSpeedKt,
+                            windDirection: current.wind_direction || 0
+                        };
+                    })
+                    .catch(error => {
+                        console.error('Error fetching wind data:', error);
+                        return null;
+                    })
                 );
             }
         }
