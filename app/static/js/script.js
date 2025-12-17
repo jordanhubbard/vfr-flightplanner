@@ -1384,8 +1384,17 @@ Object.entries(overlayCheckboxes).forEach(([type, checkbox]) => {
 });
 
 // Handle opacity changes
+const opacityValue = document.getElementById('opacity-value');
 opacitySlider.addEventListener('input', (e) => {
     const opacity = e.target.value / 100;
+    const percentage = e.target.value;
+    
+    // Update the displayed value
+    if (opacityValue) {
+        opacityValue.textContent = percentage + '%';
+    }
+    
+    // Update all active weather layers
     Object.values(weatherLayers).forEach(layer => {
         if (map.hasLayer(layer)) {
             layer.setOpacity(opacity);
