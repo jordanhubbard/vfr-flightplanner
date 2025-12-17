@@ -43,7 +43,7 @@ if __name__ == "__main__":
     reload_includes = None
     
     if settings.reload:
-        reload_dirs = ["app", "templates"]  # Watch both app/ and root templates/
+        reload_dirs = ["app"]  # Watch app/ directory including templates and static files
         reload_includes = ["*.py", "*.html", "*.css", "*.js"]
         logger.info("🔄 Hot reload enabled for Python, templates, and static files")
     
