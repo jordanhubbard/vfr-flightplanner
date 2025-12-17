@@ -175,8 +175,10 @@ def get_airport_coordinates(code):
                 'name': airport.get('name'),
                 'city': airport.get('city'),
                 'country': airport.get('country'),
-                'latitude': latitude,
-                'longitude': longitude,
+                'coordinates': {
+                    'latitude': latitude,
+                    'longitude': longitude
+                },
                 'elevation': airport.get('elevation'),
                 'type': airport.get('type'),
             }
