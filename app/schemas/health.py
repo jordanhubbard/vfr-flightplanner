@@ -69,7 +69,7 @@ class CacheStatusResponse(BaseModel):
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
-                "cache_file": "app/models/airports_cache.json",
+                "cache_file": "/app/data/airports_cache.json",
                 "cache_size": 45632,
                 "last_updated": "2023-12-01T06:00:00Z",
                 "file_size_bytes": 15728640,

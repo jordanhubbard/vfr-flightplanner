@@ -18,6 +18,7 @@ services:
       - ./frontend:/app/frontend  # Mount frontend for hot reloading
       - ./logs:/app/logs
       - ./tests:/app/tests  # Mount tests directory
+      - airport-cache-data:/app/data  # Persist airport cache across restarts
     restart: unless-stopped
     environment:
       - PYTHONPATH=/app
@@ -42,3 +43,6 @@ services:
       timeout: 10s
       retries: 3
       start_period: 30s
+
+volumes:
+  airport-cache-data:

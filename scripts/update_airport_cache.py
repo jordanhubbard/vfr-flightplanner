@@ -6,7 +6,8 @@ import logging
 
 OPENAIP_API_KEY = os.getenv('OPENAIP_API_KEY')
 OPENAIP_API_URL = 'https://api.core.openaip.net/api/airports'
-CACHE_FILE = os.path.join(os.path.dirname(__file__), '../app/models/airports_cache.json')
+# Use persistent volume location if available, fallback to legacy location
+CACHE_FILE = '/app/data/airports_cache.json' if os.path.exists('/app/data') else os.path.join(os.path.dirname(__file__), '../app/models/airports_cache.json')
 
 HEADERS = {
     'x-openaip-api-key': OPENAIP_API_KEY,

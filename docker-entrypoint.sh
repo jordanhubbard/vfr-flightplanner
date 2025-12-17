@@ -16,7 +16,9 @@ echo "Host: $HOST"
 
 # Initialize airport cache if not present
 initialize_airport_cache() {
-    CACHE_FILE="/app/app/models/airports_cache.json"
+    # Use persistent volume for cache
+    CACHE_FILE="/app/data/airports_cache.json"
+    mkdir -p /app/data
     
     if [ ! -f "$CACHE_FILE" ]; then
         echo "📍 Airport cache not found, initializing..."
@@ -32,7 +34,7 @@ import json
 import os
 
 csv_path = '/app/xctry-planner/backend/airports.csv'
-json_path = '/app/app/models/airports_cache.json'
+json_path = '/app/data/airports_cache.json'
 
 if os.path.exists(csv_path):
     airports = []

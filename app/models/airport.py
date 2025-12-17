@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 
 # In-memory cache for airport data
 _airport_cache = None
+_cache_file_mtime = None
 
 def calculate_distance(lat1, lon1, lat2, lon2):
     """
@@ -127,23 +128,50 @@ def get_airports(lat, lon, radius=50):
         return {'count': 0, 'airports': []}
 
 def load_airport_cache():
-    """Load airport data from cache file."""
-    global _airport_cache
-    if _airport_cache is None:
-        try:
-            cache_path = os.path.join(os.path.dirname(__file__), 'airports_cache.json')
+    """Load airport data from cache file with automatic refresh detection."""
+    global _airport_cache, _cache_file_mtime
+    
+    # Try multiple cache locations (persistent volume first, then fallback)
+    cache_paths = [
+        '/app/data/airports_cache.json',  # Persistent volume location
+        os.path.join(os.path.dirname(__file__), 'airports_cache.json')  # Legacy location
+    ]
+    
+    cache_path = None
+    for path in cache_paths:
+        if os.path.exists(path):
+            cache_path = path
+            break
+    
+    if cache_path is None:
+        logger.error(f"Airport cache file not found in any of: {cache_paths}")
+        _airport_cache = []
+        _cache_file_mtime = None
+        return _airport_cache
+    
+    try:
+        # Check if cache file has been modified since last load
+        current_mtime = os.path.getmtime(cache_path)
+        
+        if _airport_cache is None or _cache_file_mtime is None or current_mtime > _cache_file_mtime:
             with open(cache_path, 'r') as f:
                 _airport_cache = json.load(f)
-                logger.info(f"Loaded {len(_airport_cache)} airports from cache.")
-        except FileNotFoundError:
-            logger.error(f"Airport cache file not found at {cache_path}")
-            _airport_cache = []
-        except json.JSONDecodeError:
-            logger.error(f"Error decoding JSON from airport cache file: {cache_path}")
-            _airport_cache = []
-        except Exception as e:
-            logger.error(f"Error loading airport cache: {e}")
-            _airport_cache = []
+                _cache_file_mtime = current_mtime
+                logger.info(f"Loaded {len(_airport_cache)} airports from cache at {cache_path}")
+        
+    except FileNotFoundError:
+        logger.error(f"Airport cache file not found at {cache_path}")
+        _airport_cache = []
+        _cache_file_mtime = None
+    except json.JSONDecodeError:
+        logger.error(f"Error decoding JSON from airport cache file: {cache_path}")
+        _airport_cache = []
+        _cache_file_mtime = None
+    except Exception as e:
+        logger.error(f"Error loading airport cache: {e}")
+        _airport_cache = []
+        _cache_file_mtime = None
+    
     return _airport_cache
 
 def get_airport_coordinates(code):

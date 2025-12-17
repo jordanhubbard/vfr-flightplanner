@@ -58,7 +58,7 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = Field(30, description="Access token expiration in minutes")
     
     # File paths
-    airport_cache_file: str = Field("app/models/airports_cache.json", description="Airport cache file path")
+    airport_cache_file: str = Field("/app/data/airports_cache.json", description="Airport cache file path")
     logs_directory: str = Field("logs", description="Logs directory")
     
     class Config:

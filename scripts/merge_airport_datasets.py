@@ -7,8 +7,9 @@ OURAIRPORTS_CSV = '/app/xctry-planner/backend/airports.csv'
 print(f"[merge_airport_datasets.py] Using OurAirports CSV at: {OURAIRPORTS_CSV}")
 
 
-OPENAIP_JSON = os.path.join(os.path.dirname(__file__), '../app/models/airports_cache.json')
-MERGED_JSON = os.path.join(os.path.dirname(__file__), '../app/models/airports_cache.json')
+# Use persistent volume location if available, fallback to legacy location
+OPENAIP_JSON = '/app/data/airports_cache.json' if os.path.exists('/app/data') else os.path.join(os.path.dirname(__file__), '../app/models/airports_cache.json')
+MERGED_JSON = '/app/data/airports_cache.json' if os.path.exists('/app/data') else os.path.join(os.path.dirname(__file__), '../app/models/airports_cache.json')
 
 # Load OpenAIP airports (already in JSON)
 def load_openaip():
