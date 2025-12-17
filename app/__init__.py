@@ -279,8 +279,8 @@ def add_react_routes(app: FastAPI, settings: Settings) -> None:
                                 FastAPI backend running on port 8080
                             </div>
                             <h2>API Documentation</h2>
-                            <a href="/api/docs" class="api-link">📚 Interactive API Docs (Swagger)</a><br>
-                            <a href="/api/redoc" class="api-link">📖 ReDoc Documentation</a><br>
+                            <a href="/docs" class="api-link">📚 Interactive API Docs (Swagger)</a><br>
+                            <a href="/redoc" class="api-link">📖 ReDoc Documentation</a><br>
                             <a href="/api/health" class="api-link">❤️ Health Check</a>
                             
                             <h2>Quick Test</h2>
@@ -315,16 +315,11 @@ def add_react_routes(app: FastAPI, settings: Settings) -> None:
             except Exception as e:
                 return HTMLResponse(content=f"<h1>Error serving frontend: {e}</h1>", status_code=500)
         
-        # API Documentation routes
-        @app.get("/docs", response_class=HTMLResponse)
-        async def api_docs_redirect():
-            """Redirect to API documentation."""
-            return RedirectResponse(url="/api/docs", status_code=302)
-
+        # Alternative API documentation route (redirect /api-docs to /docs)
         @app.get("/api-docs", response_class=HTMLResponse) 
         async def api_docs_alt():
             """Alternative API documentation endpoint."""
-            return RedirectResponse(url="/api/docs", status_code=302)
+            return RedirectResponse(url="/docs", status_code=302)
         
         # Catch-all route for React SPA (must be last!)
         @app.get("/{path:path}", response_class=HTMLResponse)
@@ -349,7 +344,7 @@ def add_react_routes(app: FastAPI, settings: Settings) -> None:
             <body>
                 <h1>VFR Flight Planner API</h1>
                 <p>Frontend not built. Build with: <code>cd frontend && npm run build</code></p>
-                <p><a href="/api/docs">API Documentation</a></p>
+                <p><a href="/docs">API Documentation</a></p>
             </body>
             </html>
             """)

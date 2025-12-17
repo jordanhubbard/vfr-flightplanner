@@ -51,7 +51,7 @@ make stop
 
 The application will be available at:
 - **Main App:** http://localhost:8080
-- **API Docs:** http://localhost:8080/api/docs
+- **API Docs:** http://localhost:8080/docs
 
 ### 2. Manual Testing Checklist
 
