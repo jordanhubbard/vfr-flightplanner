@@ -19,7 +19,15 @@ start_fastapi() {
     echo "🐍 Starting FastAPI backend on $HOST:$PORT..."
     cd /app
     if [ "$ENVIRONMENT" = "development" ]; then
-        exec uvicorn app:app --host $HOST --port $PORT --reload --log-level info
+        echo "🔄 Hot reload enabled for Python, templates, and static files..."
+        exec uvicorn app:app --host $HOST --port $PORT --reload \
+            --reload-dir /app/app \
+            --reload-dir /app/templates \
+            --reload-include "*.py" \
+            --reload-include "*.html" \
+            --reload-include "*.css" \
+            --reload-include "*.js" \
+            --log-level info
     else
         exec uvicorn app:app --host $HOST --port $PORT --log-level info
     fi

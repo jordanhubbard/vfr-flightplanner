@@ -38,10 +38,21 @@ if __name__ == "__main__":
     logger.info(f"Debug mode: {settings.debug}")
     logger.info(f"API documentation: http://{settings.host}:{settings.port}{settings.docs_url}")
     
+    # Configure reload options for development
+    reload_dirs = None
+    reload_includes = None
+    
+    if settings.reload:
+        reload_dirs = ["app", "templates"]  # Watch both app/ and root templates/
+        reload_includes = ["*.py", "*.html", "*.css", "*.js"]
+        logger.info("🔄 Hot reload enabled for Python, templates, and static files")
+    
     uvicorn.run(
         "app:app",
         host=settings.host,
         port=settings.port,
         reload=settings.reload,
+        reload_dirs=reload_dirs,
+        reload_includes=reload_includes,
         log_level=settings.log_level.lower()
     ) 

@@ -114,6 +114,21 @@ Running the application locally via Python/venv is no longer supported. Always u
    - Default: `http://localhost:8080`
    - Custom port: `http://localhost:PORT` (replace PORT with your specified port number)
 
+### Hot Reload for Development
+
+The application includes **hot reload** functionality for efficient development:
+
+- **Automatic server restart** when Python, HTML, CSS, or JS files change
+- **Browser auto-refresh** when the server restarts (development mode only)
+- **Watches multiple directories**: `app/`, `templates/`, and static files
+
+**How it works:**
+1. Make changes to any `.py`, `.html`, `.css`, or `.js` file
+2. Uvicorn detects the change and restarts the server automatically
+3. The browser detects the server restart and reloads the page
+
+**Note:** Hot reload only works when `ENVIRONMENT=development` (default in Docker)
+
 ### Docker Execution
 
 1. Run using Docker Compose:

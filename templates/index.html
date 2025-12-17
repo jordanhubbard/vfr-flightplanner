@@ -149,6 +149,10 @@
         const initialLat = {{ initial_lat|tojson|safe if initial_lat else 'null' }};
         const initialLon = {{ initial_lon|tojson|safe if initial_lon else 'null' }};
     </script>
+    
+    <!-- Hot reload for development -->
+    <script src="{{ url_for('static', filename='js/hot-reload.js') }}"></script>
+    
     <script src="{{ url_for('static', filename='js/script.js') }}"></script>
 </body>
 </html> 
