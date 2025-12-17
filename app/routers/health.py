@@ -87,14 +87,14 @@ async def health_check(request: Request) -> HealthResponse:
         )
 
 
-@router.get("/airport-cache-status", response_model=CacheStatusResponse)
+@router.get("/airport-cache-status")
 @limiter.limit("5/minute")
-async def airport_cache_status(request: Request) -> CacheStatusResponse:
+async def airport_cache_status(request: Request) -> Dict[str, Any]:
     """
     Get the status of the airport cache.
     
     Returns:
-        CacheStatusResponse: Cache status information
+        Dict: Cache status information with overall_status field
     """
     try:
         import os
@@ -104,10 +104,16 @@ async def airport_cache_status(request: Request) -> CacheStatusResponse:
         cache_file = settings.airport_cache_file
         
         if not os.path.exists(cache_file):
-            raise HTTPException(
-                status_code=404,
-                detail="Airport cache file not found"
-            )
+            logger.warning(f"Airport cache file not found: {cache_file}")
+            return {
+                "overall_status": "missing",
+                "airport_cache": {
+                    "cache_file": cache_file,
+                    "exists": False,
+                    "airport_count": 0,
+                    "message": "Airport cache needs to be downloaded. Click refresh to download."
+                }
+            }
         
         # Get file stats
         stat = os.stat(cache_file)
@@ -119,55 +125,84 @@ async def airport_cache_status(request: Request) -> CacheStatusResponse:
             with open(cache_file, 'r') as f:
                 cache_data = json.load(f)
                 cache_size = len(cache_data) if isinstance(cache_data, list) else 0
-        except (json.JSONDecodeError, KeyError):
+        except (json.JSONDecodeError, KeyError) as e:
+            logger.error(f"Invalid cache file format: {e}")
             cache_size = 0
         
-        is_valid = cache_size > 0 and file_size > 0
+        is_valid = cache_size > 0 and file_size > 100
+        overall_status = "ready" if is_valid else "invalid"
         
-        return CacheStatusResponse(
-            cache_file=cache_file,
-            cache_size=cache_size,
-            last_updated=last_modified,
-            file_size_bytes=file_size,
-            is_valid=is_valid
-        )
+        return {
+            "overall_status": overall_status,
+            "airport_cache": {
+                "cache_file": cache_file,
+                "exists": True,
+                "airport_count": cache_size,
+                "last_updated": last_modified.isoformat(),
+                "file_size_bytes": file_size,
+                "is_valid": is_valid
+            }
+        }
         
-    except HTTPException:
-        raise
     except Exception as e:
         logger.error(f"Cache status check failed: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail="Failed to check cache status"
-        )
+        return {
+            "overall_status": "error",
+            "airport_cache": {
+                "exists": False,
+                "error": str(e)
+            }
+        }
 
 
 @router.post("/refresh-airport-cache", response_model=SuccessResponse)
 @limiter.limit("1/hour")
 async def refresh_airport_cache(request: Request) -> SuccessResponse:
     """
-    Refresh the airport cache in the background.
+    Refresh the airport cache by downloading from OpenAIP.
     
     Returns:
-        SuccessResponse: Cache refresh initiation confirmation
+        SuccessResponse: Cache refresh confirmation
     """
     try:
-        # This would typically trigger a background task
-        # For now, we'll just return success
-        # In a production system, you'd use FastAPI's BackgroundTasks
-        # or a task queue like Celery
+        import subprocess
+        import os
         
         logger.info("Airport cache refresh requested")
         
-        return SuccessResponse(
-            message="Airport cache refresh initiated"
+        # Run the update_airport_cache script
+        script_path = os.path.join(os.path.dirname(__file__), '../../scripts/update_airport_cache.py')
+        result = await asyncio.to_thread(
+            subprocess.run,
+            ['python3', script_path, '--force'],
+            capture_output=True,
+            text=True,
+            timeout=180  # 3 minute timeout
         )
         
+        if result.returncode == 0:
+            logger.info(f"Airport cache refreshed successfully: {result.stdout}")
+            return SuccessResponse(
+                message="Airport cache refreshed successfully"
+            )
+        else:
+            logger.error(f"Airport cache refresh failed: {result.stderr}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Airport cache refresh failed: {result.stderr}"
+            )
+        
+    except subprocess.TimeoutExpired:
+        logger.error("Airport cache refresh timed out")
+        raise HTTPException(
+            status_code=504,
+            detail="Airport cache refresh timed out"
+        )
     except Exception as e:
         logger.error(f"Cache refresh failed: {e}")
         raise HTTPException(
             status_code=500,
-            detail="Failed to initiate cache refresh"
+            detail=f"Failed to refresh cache: {str(e)}"
         )
 
 
